@@ -1,0 +1,20 @@
+# Ignore Python virtual environment
+env/
+
+# Ignore compiled Python files
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore test reports & logs
+*.log
+*.pytest_cache/
+
+# Ignore local backups & other files
+wstt-backup_*/
+backup_wstt.sh
+requirements.txt
+
+# Ignore VS Code settings (optional)
+.vscode/
+
