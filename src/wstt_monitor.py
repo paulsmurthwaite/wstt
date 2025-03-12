@@ -1,40 +1,29 @@
 #!/usr/bin/env python3
-# Enable wireless interface MONITOR mode
+# Enable wireless interface monitor mode
 
 import argparse
+import logging
 import subprocess
 import sys
-
-# ANSI escape codes for text decoration
-GREEN = "\033[92m"
-RED = "\033[91m"
-YELLOW = "\033[93m"
-RESET = "\033[0m"
-
-def check_interface_exists(interface):
-    """ Check if the specified wireless interface exists. """
-    result = subprocess.run(["ip", "link", "show", interface], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    return result.returncode == 0
-
-def get_interface_mode(interface):
-    """ Retrieve the current mode of the interface. """
-    try:
-        result = subprocess.run(["iw", interface, "info"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        for line in result.stdout.split("\n"):
-            if "type" in line:
-                return line.split()[-1]
-    except Exception:
-        return None
+from wstt_utils import check_dependencies, check_interface_exists, get_interface_mode, reset_interface, GREEN, RED, YELLOW, RESET
 
 def enable_monitor_mode(interface):
     """ Enable monitor mode on the specified wireless interface. """
+    check_dependencies()  # Ensure required tools are installed before proceeding
+
     if not check_interface_exists(interface):
-        print(f"{RED}[ERROR] Interface {interface} not found.{RESET}")
+        msg = f"Interface {interface} not found."
+        print(f"{RED}[ERROR] {msg}{RESET}")
+        logging.error(msg)
         sys.exit(1)
+
+    reset_interface(interface)
 
     current_mode = get_interface_mode(interface)
     if current_mode == "monitor":
-        print(f"{YELLOW}[INFO] {interface} is already in Monitor mode.{RESET}")
+        msg = f"{interface} is already in Monitor mode."
+        print(f"{YELLOW}[INFO] {msg}{RESET}")
+        logging.info(msg)
         sys.exit(0)
 
     try:
@@ -44,12 +33,18 @@ def enable_monitor_mode(interface):
 
         new_mode = get_interface_mode(interface)
         if new_mode == "monitor":
-            print(f"{GREEN}[SUCCESS] {interface} is now in Monitor mode.{RESET}")
+            msg = f"{interface} is now in Monitor mode."
+            print(f"{GREEN}[SUCCESS] {msg}{RESET}")
+            logging.info(msg)
         else:
-            print(f"{RED}[ERROR] Failed to enable monitor mode on {interface}.{RESET}")
+            msg = f"Failed to enable monitor mode on {interface}."
+            print(f"{RED}[ERROR] {msg}{RESET}")
+            logging.error(msg)
             sys.exit(1)
     except subprocess.CalledProcessError:
-        print(f"{RED}[ERROR] Command execution failed.{RESET}")
+        msg = "Command execution failed."
+        print(f"{RED}[ERROR] {msg}{RESET}")
+        logging.error(msg)
         sys.exit(1)
 
 if __name__ == "__main__":
@@ -58,4 +53,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     enable_monitor_mode(args.interface)
-
