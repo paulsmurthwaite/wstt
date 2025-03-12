@@ -9,6 +9,7 @@ __pycache__/
 # Ignore test reports & logs
 *.log
 *.pytest_cache/
+*.csv
 
 # Ignore local backups & other files
 wstt-backup_*/
