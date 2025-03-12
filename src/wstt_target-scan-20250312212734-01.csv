@@ -1,9 +1,0 @@
-
-BSSID, First time seen, Last time seen, channel, Speed, Privacy, Cipher, Authentication, Power, # beacons, # IV, LAN IP, ID-length, ESSID, Key
-14:49:BC:37:C2:90, 2025-03-12 21:27:34, 2025-03-12 21:27:48,  1, 270, WPA2, CCMP, PSK, -43,      140,       64,   0.  0.  0.  0,   5, AIR2X, 
-
-Station MAC, First time seen, Last time seen, Power, # packets, BSSID, Probed ESSIDs
-74:A7:EA:11:EC:EF, 2025-03-12 21:27:35, 2025-03-12 21:27:48, -75,       10, 14:49:BC:37:C2:90,
-04:17:B6:DB:2A:D1, 2025-03-12 21:27:34, 2025-03-12 21:27:47, -60,        8, 14:49:BC:37:C2:90,
-10:2C:B1:A6:64:72, 2025-03-12 21:27:37, 2025-03-12 21:27:47, -51,       38, 14:49:BC:37:C2:90,
-
