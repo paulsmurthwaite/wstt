@@ -14,6 +14,7 @@ Module:      TM470-25B
 """
 
 
+import argparse
 import os
 import time
 import subprocess
@@ -43,6 +44,11 @@ if not logger.hasHandlers():
     log_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
     logger.addHandler(log_handler)
 
+# Define scans directory
+scans_dir = os.path.join(os.path.dirname(__file__), "scans")
+os.makedirs(scans_dir, exist_ok=True)  # Create scans/ if missing
+
+
 def scan_all_traffic(interface):
     """Runs airodump-ng, captures all visible Wi-Fi traffic, and ensures a clean exit."""
 
@@ -65,9 +71,9 @@ def scan_all_traffic(interface):
         time.sleep(2)
         enable_mode(interface, "monitor")
 
-    # Generate filename using timestamp
+    # Generate filename using timestamp in scans/ directory
     timestamp = time.strftime("%Y%m%d%H%M%S")  # Format: YYYYMMDDhhmmss
-    output_file = f"wstt_full-scan-{timestamp}"
+    output_file = os.path.join(scans_dir, f"wstt_full-scan-{timestamp}")
 
     stop_event = threading.Event()
     spinner_thread = threading.Thread(target=spinner, args=(stop_event,))
@@ -122,5 +128,8 @@ def scan_all_traffic(interface):
     time.sleep(3)
 
 if __name__ == "__main__":
-    interface = "wlx00c0cab4b58c"  # Set the correct wireless interface
-    scan_all_traffic(interface)
+    parser = argparse.ArgumentParser(description="Full Wi-Fi scan using airodump-ng.")
+    parser.add_argument("-i", "--interface", required=True, help="Wireless interface to use for scanning")
+    args = parser.parse_args()
+
+    scan_all_traffic(args.interface)

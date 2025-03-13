@@ -14,6 +14,8 @@ Date:        [YYYY-MM-DD]
 Module:      TM470-25B
 """
 
+
+import argparse
 import os
 import time
 import subprocess
@@ -44,14 +46,26 @@ if not logger.hasHandlers():
     log_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
     logger.addHandler(log_handler)
 
+# Define scans directory
+scans_dir = os.path.join(os.path.dirname(__file__), "scans")
+os.makedirs(scans_dir, exist_ok=True)  # Create scans/ if missing
+
 
 def get_latest_scan():
-    """Finds the most recent full scan CSV file."""
+    """Finds the most recent full scan CSV file inside the scans/ directory."""
+    scans_dir = os.path.join(os.path.dirname(__file__), "scans")
+    
+    # Ensure the scans directory exists
+    if not os.path.exists(scans_dir):
+        logger.error("[ERROR] Scans directory not found.")
+        return None
+
     scan_files = sorted(
-        [f for f in os.listdir() if f.startswith("wstt_full-scan-") and f.endswith("-01.csv")],
+        [os.path.join(scans_dir, f) for f in os.listdir(scans_dir) if f.startswith("wstt_full-scan-") and f.endswith("-01.csv")],
         key=os.path.getmtime,
         reverse=True
     )
+
     return scan_files[0] if scan_files else None
 
 
@@ -127,9 +141,9 @@ def scan_target_ap(interface, target_ap):
         enable_mode(interface, "monitor")
         time.sleep(2)
 
-    # Generate filename using timestamp
+    # Generate filename using timestamp in scans/ directory
     timestamp = time.strftime("%Y%m%d%H%M%S")  # Format: YYYYMMDDhhmmss
-    output_file = f"wstt_target-scan-{timestamp}"
+    output_file = os.path.join(scans_dir, f"wstt_target-scan-{timestamp}")
 
     # Start spinner thread
     stop_event = threading.Event()
@@ -189,9 +203,11 @@ def scan_target_ap(interface, target_ap):
 
 
 if __name__ == "__main__":
-    interface = "wlx00c0cab4b58c"  # Set the correct wireless interface
-    latest_scan = get_latest_scan()
+    parser = argparse.ArgumentParser(description="Targeted Wi-Fi scan using airodump-ng.")
+    parser.add_argument("-i", "--interface", required=True, help="Wireless interface to use for scanning")
+    args = parser.parse_args()
 
+    latest_scan = get_latest_scan()
     if not latest_scan:
         print("[ERROR] No previous scan found. Run `wstt_full-scan.py` first.")
         sys.exit(1)
@@ -204,4 +220,4 @@ if __name__ == "__main__":
         sys.exit(1)
 
     target_ap = select_target_ap(ap_list)
-    scan_target_ap(interface, target_ap)
+    scan_target_ap(args.interface, target_ap)
