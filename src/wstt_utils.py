@@ -17,16 +17,22 @@ Module:      TM470-25B
 
 
 import logging
+import os
 import subprocess
 import shutil
 import sys
 import time
 
+# Define log directory and file
+log_dir = os.path.join(os.path.dirname(__file__), "logs")
+os.makedirs(log_dir, exist_ok=True)  # Create logs/ if missing
+
+log_file = os.path.join(log_dir, "wstt.log")  # Unified log file for all scripts
+
 # Configure logging
 logger = logging.getLogger("wstt")
 logger.setLevel(logging.INFO)
 
-log_file = "wstt.log"
 if not logger.hasHandlers():
     log_handler = logging.FileHandler(log_file)
     log_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
