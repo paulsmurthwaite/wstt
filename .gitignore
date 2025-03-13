@@ -13,8 +13,8 @@ __pycache__/
 
 # Ignore local backups & other files
 wstt-backup_*/
-backup_wstt.sh
-requirements.txt
+*.sh
+*.txt
 
 # Ignore VS Code settings (optional)
 .vscode/
