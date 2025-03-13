@@ -39,12 +39,23 @@ log_file = os.path.join(log_dir, "wstt.log")  # Unified log file for all scripts
 
 # Configure logging
 logger = logging.getLogger("wstt")
-logger.setLevel(logging.INFO)
 
+# Avoid adding duplicate handlers
 if not logger.hasHandlers():
+    logger.setLevel(logging.INFO)  # Default level
+
+    # File logging (stores all logs)
     log_handler = logging.FileHandler(log_file)
-    log_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    log_handler.setFormatter(formatter)
+    log_handler.setLevel(logging.INFO)  # Store all logs
     logger.addHandler(log_handler)
+
+    # Console error logging (shows only errors)
+    error_handler = logging.StreamHandler()  # Send errors to terminal
+    error_handler.setFormatter(formatter)
+    error_handler.setLevel(logging.ERROR)  # Only show ERROR messages
+    logger.addHandler(error_handler)
 
 # Define scans directory
 scans_dir = os.path.join(os.path.dirname(__file__), "scans")
