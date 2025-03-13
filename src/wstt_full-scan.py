@@ -139,6 +139,7 @@ def scan_all_traffic(interface):
     time.sleep(3)
 
 if __name__ == "__main__":
+    # Argument parser for CLI options
     parser = argparse.ArgumentParser(description="Full Wi-Fi scan using airodump-ng.")
     parser.add_argument("-i", "--interface", required=True, help="Wireless interface to use for scanning")
     args = parser.parse_args()
