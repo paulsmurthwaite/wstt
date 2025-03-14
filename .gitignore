@@ -16,6 +16,9 @@ wstt-backup_*/
 *.sh
 *.txt
 
+# Ignore old versions
+niu/
+
 # Ignore VS Code settings (optional)
 .vscode/
 
