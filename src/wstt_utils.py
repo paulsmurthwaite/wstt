@@ -1,7 +1,17 @@
 #!/usr/bin/env python3
+"""Filename goes here
+
+Information goes here
+
+Author:      [Your Name]
+Date:        [YYYY-MM-DD]
+Module:      [Module Code]
+"""
+
 
 import click
 import json
+import logging
 import os
 import subprocess
 import time
@@ -14,6 +24,10 @@ def load_config():
     """Load configuration from JSON file, creating it if missing."""
     if not os.path.exists(config_file):
         # Create default config if file doesn't exist
+        default_config = {
+            "interface": None,
+            "log_file": "/logs/wstt.log"  # Default log file location
+        }
         with open(config_file, "w") as f:
             json.dump({}, f, indent=4)
 
@@ -22,6 +36,10 @@ def load_config():
             return json.load(f)  # Load the existing config
     except json.JSONDecodeError:
         # If the file is corrupted, reset it
+        default_config = {
+            "interface": None,
+            "log_file": "/logs/wstt.log"
+        }
         with open(config_file, "w") as f:
             json.dump({}, f, indent=4)
         return {}
@@ -32,6 +50,56 @@ def save_config(config):
     with open(config_file, "w") as f:
         json.dump(config, f, indent=4)
 
+def setup_logger():
+    """Initialize logging configuration dynamically from config file."""
+    config = load_config()
+    log_path = config.get("log_file", "./logs/wstt.log")  # Use default if missing
+
+    # Ensure the log directory exists
+    log_dir = os.path.dirname(log_path)
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir, exist_ok=True)
+
+    # Configure logging
+    logging.basicConfig(
+        filename=log_path,
+        filemode="a",  # Append mode
+        format="[{asctime}] [{levelname}] {message}",
+        style="{",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        level=logging.INFO  # Default level is INFO
+    )
+
+    logging.info("WSTT logging initialized.")  # Log once at startup
+
+def log_message(level, message):
+    """
+    Log a message with the specified level.
+
+    :param level: Log level ("INFO", "WARNING", "ERROR", "CRITICAL")
+    :param message: Log message content
+    """
+    # Ensure logging is set up
+    setup_logger()
+
+    # Log based on level
+    if level == "INFO":
+        logging.info(message)
+    elif level == "WARNING":
+        logging.warning(message)
+    elif level == "ERROR":
+        logging.error(message)
+        print(f"[ERROR] {message}")  # Print errors to console
+    elif level == "CRITICAL":
+        logging.critical(message)
+        print(f"[CRITICAL] {message}")  # Print critical issues to console
+
+# Confirm log setup by returning the expected log file path
+load_config()["log_file"]
+
+# Initialize logging when this helper file is imported
+setup_logger()
+
 # Retrieve selected interface
 def get_selected_interface():
     """Retrieve the selected interface from the config file."""
@@ -40,7 +108,7 @@ def get_selected_interface():
 
 # List interfaces
 @click.command()
-def list_interfaces():
+def get_interfaces():
     """List available wireless interfaces."""
     try:
         result = subprocess.run(["sudo", "airmon-ng"], capture_output=True, text=True, check=True)
@@ -54,7 +122,7 @@ def list_interfaces():
 # Select interface
 @click.command()
 @click.pass_context
-def select_interface(ctx):
+def set_interface(ctx):
     """Select from a list of available interfaces."""
     click.echo("\nScanning for available wireless interfaces...\n")
 
@@ -173,8 +241,17 @@ def bring_interface_up():
     except subprocess.CalledProcessError:
         click.echo("\033[91m[ERROR] Failed to bring the interface up.\033[0m", err=True)
 
+# Set Mode Type (Managed/Monitor)
+@click.command("mode")
+@click.argument("mode_type", type=click.Choice(["managed", "monitor"], case_sensitive=False))
+def set_mode(mode_type):
+    """Set the interface mode (managed or monitor)."""
+    if mode_type == "managed":
+        set_managed_mode()
+    elif mode_type == "monitor":
+        set_monitor_mode()
+
 # Set Managed mode
-@click.command()
 def set_managed_mode():
     """Set the selected wireless interface to Managed Mode."""
     interface = get_selected_interface()
@@ -217,7 +294,6 @@ def set_managed_mode():
         click.echo("\033[91m[ERROR] Failed to switch interface to Managed Mode. Check if the interface supports Managed Mode and try again.\033[0m", err=True)
 
 # Set Monitor mode
-@click.command()
 def set_monitor_mode():
     """Set the selected wireless interface to Monitor Mode."""
     interface = get_selected_interface()
@@ -323,9 +399,9 @@ def reset_interface(reset_type):
 
         # Restore Original Mode (Managed/Monitor)
         if mode == "Managed":
-            set_managed_mode.invoke(click.Context(set_managed_mode))
+            set_managed_mode()
         elif mode == "Monitor":
-            set_monitor_mode.invoke(click.Context(set_monitor_mode))
+            set_monitor_mode()
 
         click.echo(f"\033[92m[+] {reset_type.capitalize()} Reset Completed for {interface}.\033[0m")
 

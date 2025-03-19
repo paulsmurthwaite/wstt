@@ -1,3 +1,4 @@
 {
-    "interface": "wlx00c0cab4b58c"
+    "interface": "wlx00c0cab4b58c",
+    "log_file": "./logs/wstt.log"
 }

@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
+"""Filename goes here
+
+Information goes here
+
+Author:      [Your Name]
+Date:        [YYYY-MM-DD]
+Module:      [Module Code]
+"""
+
 
 import click
 from wstt_utils import (
-    list_interfaces,
-    select_interface,
+    get_interfaces,
+    set_interface,
     show_interface,
-    set_managed_mode,
-    set_monitor_mode,
+    set_mode,
     reset_interface
 )
 
@@ -16,11 +24,10 @@ def cli():
     pass
 
 # Register CLI commands
-cli.add_command(list_interfaces, name="list")
-cli.add_command(select_interface, name="select")
+cli.add_command(get_interfaces, name="get")
+cli.add_command(set_interface, name="set")
 cli.add_command(show_interface, name="show")
-cli.add_command(set_managed_mode, name="managed")
-cli.add_command(set_monitor_mode, name="monitor")
+cli.add_command(set_mode, name="mode")
 cli.add_command(reset_interface, name="reset")
 
 if __name__ == "__main__":
