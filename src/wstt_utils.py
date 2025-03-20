@@ -19,43 +19,33 @@ from wstt_logging import log_message
 
 config_file = "wstt_config.json"
 
-# Default Configuration
-default_config = {
-    "interface": None,
-    "log_file": "./logs/wstt.log",  # Default log location
-    "colors": {
-        "success": "\\033[92m",
-        "info": "\\033[90m",
-        "warning": "\\033[93m",
-        "error": "\\033[91m",
-        "title": "\\033[1;94m",
-        "reset": "\\033[0m"
-    }
-}
-
 # Load Configuration
 def load_config():
-    """Load configuration from JSON file, creating it if missing."""
+    """Load configuration from JSON file, ensuring all required keys exist."""
     if not os.path.exists(config_file):
-        with open(config_file, "w") as f:
-            json.dump(default_config, f, indent=4)
+        log_message("error", "Configuration file missing. WSTT cannot run without wstt_config.json.")
+        raise FileNotFoundError(format_message("error", "Configuration file missing. Please restore wstt_config.json."))
 
     try:
         with open(config_file, "r") as f:
             config = json.load(f)
-
-        # Ensure all keys are added
-        for key, value in default_config.items():
-            if key not in config:
-                config[key] = value
-
-        return config
-
     except json.JSONDecodeError:
-        # If the file is corrupted, reset it
-        with open(config_file, "w") as f:
-            json.dump(default_config, f, indent=4)
-        return default_config
+        log_message("error", "Configuration file is corrupted. Please fix or restore wstt_config.json.")
+        raise ValueError(format_message("error", "Configuration file is corrupted. Please restore a valid wstt_config.json."))
+
+    # Check for missing keys - no overwrite defaults
+    required_keys = [
+        "interface", "log_file", "scan_directory", "capture_directory",
+        "file_naming", "time_control", "colors"
+    ]
+
+    missing_keys = [key for key in required_keys if key not in config]
+
+    if missing_keys:
+        log_message("error", f"Configuration file is missing required keys: {missing_keys}. Please update wstt_config.json.")
+        raise KeyError(format_message("error", f"Missing required keys in wstt_config.json: {missing_keys}"))
+
+    return config
 
 # Save Configuration
 def save_config(config):
