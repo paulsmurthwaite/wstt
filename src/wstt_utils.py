@@ -19,36 +19,75 @@ from wstt_logging import log_message
 
 config_file = "wstt_config.json"
 
+# Default Configuration
+default_config = {
+    "interface": None,
+    "log_file": "./logs/wstt.log",  # Default log location
+    "colors": {
+        "success": "\\033[92m",
+        "info": "\\033[90m",
+        "warning": "\\033[93m",
+        "error": "\\033[91m",
+        "title": "\\033[1;94m",
+        "reset": "\\033[0m"
+    }
+}
+
 # Load Configuration
 def load_config():
     """Load configuration from JSON file, creating it if missing."""
     if not os.path.exists(config_file):
-        # Create default config if file doesn't exist
-        default_config = {
-            "interface": None,
-            "log_file": "/logs/wstt.log"  # Default log file location
-        }
         with open(config_file, "w") as f:
-            json.dump({}, f, indent=4)
+            json.dump(default_config, f, indent=4)
 
     try:
         with open(config_file, "r") as f:
-            return json.load(f)  # Load the existing config
+            config = json.load(f)
+
+        # Ensure all keys are added
+        for key, value in default_config.items():
+            if key not in config:
+                config[key] = value
+
+        return config
+
     except json.JSONDecodeError:
         # If the file is corrupted, reset it
-        default_config = {
-            "interface": None,
-            "log_file": "/logs/wstt.log"
-        }
         with open(config_file, "w") as f:
-            json.dump({}, f, indent=4)
-        return {}
+            json.dump(default_config, f, indent=4)
+        return default_config
 
 # Save Configuration
 def save_config(config):
     """Save the configuration to JSON file."""
     with open(config_file, "w") as f:
         json.dump(config, f, indent=4)
+
+# Text Decoration Configuration
+def format_message(message_type, message):
+    """Format a message with ANSI color codes from config.
+    
+    - `message_type`: "error", "info", "success", "title", etc.
+    - `message`: The actual text to format.
+    """
+    colors = load_config().get("colors", {})
+    color = colors.get(message_type, colors.get("reset", "\\033[0m"))  # Use raw string from JSON
+    color = color.replace("\\033", "\033")  # Convert to actual ANSI escape sequence
+    reset = colors.get('reset', "\\033[0m").replace("\\033", "\033")  # Ensure reset works correctly
+
+    # Dictionary lookup for message formatting
+    message_formats = {
+        "error": f"[ERROR] {message}",
+        "warning": f"[WARNING] {message}",
+        "info": f"[INFO] {message}",
+        "success": f"[+] {message}",
+        "title": f"\n[ {message} ]"
+    }
+
+    # Retrieve message from dictionary
+    formatted_message = message_formats.get(message_type, message)
+
+    return "{}{}{}".format(color, formatted_message, reset)
 
 # Get Selected Interface
 def get_selected_interface():
@@ -61,7 +100,7 @@ def get_selected_interface():
 def get_interfaces():
     """List available wireless interfaces."""
 
-    click.echo("\n\033[94m[ Available Interfaces ]\033[0m")  # Blue heading
+    click.echo(format_message("title", "Available Interfaces"))
 
     try:
         result = subprocess.run(["sudo", "airmon-ng"], capture_output=True, text=True, check=True)
@@ -69,23 +108,23 @@ def get_interfaces():
             click.echo(result.stdout)
         else:
             log_message("WARNING", "No wireless interfaces found.")
-            click.echo("[ERROR] No wireless interfaces found.", err=True)
+            click.echo(format_message("error", "No wireless interfaces found."))
     except subprocess.CalledProcessError:
         log_message("ERROR", "Failed to retrieve wireless interfaces.  Is Aircrack-ng installed?")
-        click.echo("[ERROR] Failed to retrieve wireless interfaces.  Is Aircrack-ng installed?", err=True)
+        click.echo(format_message("error", "Failed to retrieve wireless interfaces.  Is Aircrack-ng installed?"))
 
 # Set Interface
 @click.command()
 @click.pass_context
 def set_interface(ctx):
     """Select from a list of available interfaces."""
-    click.echo("\n\033[94m[ Select Interface ]\033[0m")  # Blue heading
+    click.echo(format_message("title", "Select Interface"))
 
     try:
         result = subprocess.run(["sudo", "airmon-ng"], capture_output=True, text=True, check=True)
         if not result.stdout.strip():
             log_message("WARNING", "No wireless interfaces found when attempting to set an interface.")
-            click.echo("\033[91m[ERROR] No wireless interfaces found.\033[0m", err=True)
+            click.echo(format_message("error", "No wireless interfaces found."))
             return
 
         click.echo(result.stdout)  # Display full output to the user
@@ -103,11 +142,11 @@ def set_interface(ctx):
             json.dump(config, f, indent=4)
 
         log_message("INFO", f"User selected interface: {selected_interface}")       
-        click.echo(f"\n\033[92m[+] Selected interface: {selected_interface}\033[0m")
+        click.echo(format_message("success", f"Selected interface: {selected_interface}"))
 
     except subprocess.CalledProcessError:
         log_message("ERROR", "Failed to retrieve wireless interfaces.  Is Aircrack-ng installed?")
-        click.echo("\033[91m[ERROR] Failed to retrieve wireless interfaces.  Is Aircrack-ng installed?\033[0m", err=True)
+        click.echo(format_message("error", "Failed to retrieve wireless interfaces.  Is Aircrack-ng installed?"))
 
 # Show Interface
 @click.command()
@@ -117,10 +156,11 @@ def show_interface():
 
     if not interface:
         log_message("WARNING", "No interface selected when attempting to display interface details.")
-        click.echo("\033[91m[ERROR] No interface selected. Please run 'wstt_interface.py select' first.\033[0m")
+        click.echo(format_message("error", "No interface selected. Please run 'wstt_interface.py set"))
         return
 
-    click.echo("\n\033[94m[ Current Interface ]\033[0m\n")  # Blue heading
+    click.echo(format_message("title", "Current Interface"))
+    click.echo()  # Blank line
 
     try:
         # Get MAC Address & Interface State
@@ -169,7 +209,7 @@ def show_interface():
 
     except subprocess.CalledProcessError:
         log_message("ERROR", "Failed to retrieve interface details.  Are 'ip', 'iw', 'airmon-ng', and 'lshw' installed?")
-        click.echo("\033[91m[ERROR] Failed to retrieve interface details.  Are 'ip', 'iw', 'airmon-ng', and 'lshw' installed?\033[0m", err=True)
+        click.echo(format_message("error", "Failed to retrieve interface details.  Are 'ip', 'iw', 'airmon-ng', and 'lshw' installed?"))
 
 # Set Interface State
 def set_interface_state(state):
@@ -177,7 +217,7 @@ def set_interface_state(state):
     interface = get_selected_interface()
     if not interface:
         log_message("WARNING", "No interface selected when attempting to bring interface UP/DOWN.")
-        click.echo("\033[91m[ERROR] No interface selected.\033[0m")
+        click.echo(format_message("error", "No interface selected."))
         return
 
     try:
@@ -185,7 +225,7 @@ def set_interface_state(state):
         log_message("INFO", f"Interface {interface} set to {state}.")
     except subprocess.CalledProcessError:
         log_message("ERROR", f"Failed to bring interface {interface} {state}.")
-        click.echo(f"\033[91m[ERROR] Failed to bring the interface {state}.\033[0m", err=True)
+        click.echo(format_message("error", f"Failed to bring the interface {state}."))
 
 # Get Interface Mode
 def get_mode(interface):
@@ -217,7 +257,7 @@ def set_mode_type(mode_type):
     interface = get_selected_interface()
     if not interface:
         log_message("WARNING", "No interface selected when attempting to change mode.")
-        click.echo("\033[91m[ERROR] No interface selected.\033[0m")
+        click.echo(format_message("error", "No interface selected."))
         return
 
     try:
@@ -225,7 +265,7 @@ def set_mode_type(mode_type):
         log_message("INFO", f"Interface {interface} mode changed to {mode_type}.")
     except subprocess.CalledProcessError:
         log_message("ERROR", f"Failed to switch interface {interface} to {mode_type} Mode.")
-        click.echo(f"\033[91m[ERROR] Failed to switch interface to {mode_type} Mode.\033[0m")
+        click.echo(format_message("error", f"Failed to switch interface to {mode_type} Mode."))
 
 # Managed Mode
 def set_managed_mode():
@@ -234,16 +274,16 @@ def set_managed_mode():
 
     if not interface:
         log_message("WARNING", "No interface selected when attempting to switch to Managed Mode.")
-        click.echo("\033[91m[ERROR] No interface selected. Please run 'wstt_interface.py select' first.\033[0m")
+        click.echo(format_message("error", "No interface selected. Please run 'wstt_interface.py set"))
         return
 
-    click.echo("\n\033[94m[ Set Managed Mode ]\033[0m\n")
+    click.echo(format_message("title", "Set Managed Mode"))
 
     try:
         # Get Mode
         if get_mode(interface) == "Managed":
             log_message("INFO", f"Interface {interface} is already in Managed Mode. No changes made.")
-            click.echo(f"\033[93m[INFO] Interface {interface} is already in Managed Mode. No changes made.\033[0m\n")
+            click.echo(format_message("info", f"Interface {interface} is already in Managed Mode. No changes made."))
             return
 
         set_interface_state("down")
@@ -254,14 +294,14 @@ def set_managed_mode():
         mode_after = get_mode(interface)
         if mode_after == "Managed":
             log_message("INFO", f"Interface {interface} successfully switched to Managed Mode.")
-            click.echo(f"\033[92m[+] Interface {interface} is now in Managed Mode.\033[0m\n")
+            click.echo(format_message("success", f"Interface {interface} is now in Managed Mode."))
         else:
             log_message("WARNING", f"Interface {interface} failed to switch to Managed Mode. Current mode: {mode_after}.")
-            click.echo(f"\033[91m[WARNING] Interface {interface} did not switch to Managed Mode. Current mode: {mode_after}.\033[0m\n")
+            click.echo(format_message("warning", f"Interface {interface} did not switch to Managed Mode. Current mode: {mode_after}."))
 
     except subprocess.CalledProcessError:
         log_message("ERROR", f"Failed to switch interface {interface} to Managed Mode.")
-        click.echo("\033[91m[ERROR] Failed to switch interface to Managed Mode. Check if the interface supports Managed Mode and try again.\033[0m\n", err=True)
+        click.echo(format_message("error", "Failed to switch interface to Managed Mode. Check if the interface supports Managed Mode and try again."))
 
 # Monitor Mode
 def set_monitor_mode():
@@ -270,16 +310,16 @@ def set_monitor_mode():
 
     if not interface:
         log_message("WARNING", "No interface selected when attempting to switch to Monitor Mode.")        
-        click.echo("\033[91m[ERROR] No interface selected. Please run 'wstt_interface.py select' first.\033[0m")
+        click.echo(format_message("error", "No interface selected. Please run 'wstt_interface.py set"))
         return
 
-    click.echo("\n\033[94m[ Set Monitor Mode ]\033[0m\n")
+    click.echo(format_message("title", "Set Monitor Mode"))
 
     try:
         # Check Mode
         if get_mode(interface) == "Monitor":
             log_message("INFO", f"Interface {interface} is already in Monitor Mode. No changes made.")
-            click.echo(f"\033[93m[INFO] Interface {interface} is already in Monitor Mode. No changes made.\033[0m\n")
+            click.echo(format_message("info", f"Interface {interface} is already in Monitor Mode. No changes made."))
             return
 
         set_interface_state("down")
@@ -290,14 +330,14 @@ def set_monitor_mode():
         mode_after = get_mode(interface)
         if mode_after == "Monitor":
             log_message("INFO", f"Interface {interface} successfully switched to Monitor Mode.")
-            click.echo(f"\033[92m[+] Interface {interface} is now in Monitor Mode.\033[0m\n")
+            click.echo(format_message("success", f"Interface {interface} is now in Monitor Mode."))
         else:
             log_message("WARNING", f"Interface {interface} failed to switch to Monitor Mode. Current mode: {mode_after}.")
-            click.echo(f"\033[91m[WARNING] Interface {interface} did not switch to Monitor Mode. Current mode: {mode_after}.\033[0m\n")
+            click.echo(format_message("warning", f"Interface {interface} did not switch to Monitor Mode. Current mode: {mode_after}."))
 
     except subprocess.CalledProcessError:
         log_message("ERROR", f"Failed to switch interface {interface} to Monitor Mode.")
-        click.echo("\033[91m[ERROR] Failed to switch interface to Monitor Mode. Check if the interface supports Monitor Mode and try again.\033[0m\n", err=True)
+        click.echo(format_message("error", "Failed to switch interface to Managed Mode. Check if the interface supports Monitor Mode and try again."))
 
 # Reset Interface Driver
 def reload_driver(driver):
@@ -330,25 +370,25 @@ def reset_interface(reset_type):
 
     if not interface:
         log_message("WARNING", "No interface selected when attempting to reset.")
-        click.echo("\033[91m[ERROR] No interface selected. Please run 'wstt_interface.py select' first.\033[0m")
+        click.echo(format_message("error", "No interface selected. Please run 'wstt_interface.py set"))
         return
 
     log_message("INFO", f"Starting {reset_type} reset for interface {interface}.")
-    click.echo("\n\033[94m[ Interface Reset ]\033[0m\n")
+    click.echo(format_message("title", "Interface Reset"))
 
     try:
         # Soft Reset
         if reset_type == "soft":
-            click.echo(f"\033[94m[INFO] Performing a {reset_type} reset...\033[0m")
+            click.echo(format_message("info", f"Performing a {reset_type} reset..."))
             set_interface_state("down")
-            click.echo("\033[94m[INFO] Waiting for interface to reinitialise...\033[0m")
+            click.echo(format_message("info", "Waiting for interface to reinitialise..."))
             time.sleep(3)  # Delay
             set_interface_state("up")
             log_message("INFO", f"Starting {reset_type} reset for interface {interface}.")            
 
         # Hard Reset
         elif reset_type == "hard":
-            click.echo(f"\033[94m[INFO] Performing a {reset_type} reset...\033[0m")
+            click.echo(format_message("info", f"Performing a {reset_type} reset..."))
 
             # Retrieve Kernel Module Name
             driver = "Unknown"
@@ -358,7 +398,7 @@ def reset_interface(reset_type):
                     capture_output=True, text=True, check=True
                 )
                 driver = driver_path.stdout.strip().split("/")[-1]  # Parse
-                click.echo("\033[94m[INFO] Waiting for interface to reinitialise...\033[0m")
+                click.echo(format_message("info", "Waiting for interface to reinitialise..."))
             except subprocess.CalledProcessError:
                 log_message("ERROR", "Failed to retrieve kernel module for interface.")
 
@@ -372,21 +412,21 @@ def reset_interface(reset_type):
         while timeout > 0:
             if interface in os.listdir("/sys/class/net/"):
                 log_message("INFO", f"Interface {interface} successfully reset.")
-                click.echo(f"\033[92m[+] Interface {interface} successfully reset.\033[0m")
+                click.echo(format_message("success", f"Interface {interface} successfully reset."))
                 break
             time.sleep(1)  # Delay before retry
             timeout -= 1
 
         if interface not in os.listdir("/sys/class/net/"):
             log_message("ERROR", f"Interface {interface} did not reappear after reset.")
-            click.echo("\033[91m[ERROR] Interface did not reappear after driver reload. Please check manually.\033[0m\n")
+            click.echo(format_message("error", "Interface did not reappear after driver reload. Please check manually."))
 
         # Show & Finish
         mode = get_mode(interface)
-        click.echo(f"\033[92m[+] Interface {interface} is in {mode} Mode.\033[0m")
+        click.echo(format_message("success", f"Interface {interface} is in {mode} Mode."))
         log_message("INFO", f"{reset_type.capitalize()} Reset Completed for {interface}.")
-        click.echo(f"\033[92m[+] {reset_type.capitalize()} Reset Completed for {interface}.\033[0m\n")
+        click.echo(format_message("success", f"{reset_type.capitalize()} Reset Completed for {interface}."))
 
     except subprocess.CalledProcessError:
         log_message("ERROR", f"Failed to reset interface {interface}.")
-        click.echo("\033[91m[ERROR] Failed to reset the interface. Check permissions and driver status.\033[0m\n", err=True)
+        click.echo(format_message("error", "Failed to reset the interface. Check permissions and driver status."))
