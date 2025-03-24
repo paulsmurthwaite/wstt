@@ -15,7 +15,8 @@ from wstt_utils import (
     set_interface,
     show_interface,
     set_mode,
-    reset_interface
+    reset_interface,
+    scan_interface
 )
 
 @click.group()
@@ -29,6 +30,7 @@ cli.add_command(set_interface, name="set")
 cli.add_command(show_interface, name="show")
 cli.add_command(set_mode, name="mode")
 cli.add_command(reset_interface, name="reset")
+cli.add_command(scan_interface, name="scan")
 
 if __name__ == "__main__":
     cli()

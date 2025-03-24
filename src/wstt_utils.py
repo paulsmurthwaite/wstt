@@ -420,3 +420,22 @@ def reset_interface(reset_type):
     except subprocess.CalledProcessError:
         log_message("ERROR", f"Failed to reset interface {interface}.")
         click.echo(format_message("error", "Failed to reset the interface. Check permissions and driver status."))
+
+@click.command()
+@click.argument("scan_type", type=click.Choice(["full", "filter"], case_sensitive=False))
+def scan_interface(scan_type):
+    """Start a wireless traffic scan."""
+    if scan_type == "full":
+        scan_full()
+    elif scan_type == "filter":
+        scan_filter()
+
+def scan_full():
+    # TBC
+    print("Full Scan")
+    pass
+
+def scan_filter():
+    # TBC
+    print("Filter Scan")
+    pass
