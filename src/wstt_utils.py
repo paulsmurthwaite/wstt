@@ -10,10 +10,15 @@ Module:      [Module Code]
 
 
 import click
+import csv
+import glob
 import json
 import os
 import subprocess
+import sys
+import threading
 import time
+from datetime import datetime
 from tabulate import tabulate
 from wstt_logging import log_message
 
@@ -421,6 +426,33 @@ def reset_interface(reset_type):
         log_message("ERROR", f"Failed to reset interface {interface}.")
         click.echo(format_message("error", "Failed to reset the interface. Check permissions and driver status."))
 
+def run_scan(command):
+    """Run scan subprocess with specified shell command."""
+    try:
+        subprocess.run(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception as e:
+        click.echo(format_message("ERROR", f"Scan execution failed: {str(e)}"))
+        log_message("ERROR", f"Scan execution failed: {str(e)}")
+
+def run_countdown(duration, message):
+    """Display a countdown timer."""
+    for remaining in range(duration, 0, -1):
+        timer_line = format_message("INFO", f"{message} {remaining}")
+        sys.stdout.write(f"\r{timer_line.ljust(80)}")
+        sys.stdout.flush()
+        time.sleep(1)
+
+    # Clear line and reset cursor
+    sys.stdout.write("\r" + " " * 80 + "\r")
+
+def scan_cleanup(base_path):
+    """Remove unwanted output files from airodump-ng scan."""
+    extensions_to_remove = [".netxml", ".kismet.csv", ".log.csv"]
+    for ext in extensions_to_remove:
+        target = f"{base_path}{ext}"
+        if os.path.exists(target):
+            os.remove(target)
+
 @click.command()
 @click.argument("scan_type", type=click.Choice(["full", "filter"], case_sensitive=False))
 def scan_interface(scan_type):
@@ -431,11 +463,158 @@ def scan_interface(scan_type):
         scan_filter()
 
 def scan_full():
-    # TBC
-    print("Full Scan")
-    pass
+    """Capture all visible wireless traffic and write to CSV"""
+
+    config = load_config()
+    interface = get_selected_interface()
+
+    if not interface:
+        click.echo(format_message("error", "No interface selected. Please set an interface before scanning."))
+        return   
+
+    scan_dir = config.get("scan_directory", "./scans/")
+    filename_template = config.get("file_naming", {}).get("full_scan", "wstt_full-scan-{timestamp}.csv")
+
+    # Ensure output directory exists
+    os.makedirs(scan_dir, exist_ok=True)
+
+    # Prompt user for scan duration
+    click.echo(format_message("title", "Full Traffic Scan"))
+    duration = click.prompt("Enter scan duration in seconds", type=int)
+
+    # Generate timestamped filename
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    filename_base = filename_template.replace("{timestamp}", timestamp).replace(".csv", "")
+    output_path = os.path.join(scan_dir, filename_base)
+
+    # Build airodump-ng command
+    command = f"sudo timeout {duration} airodump-ng {interface} --write {output_path} --output-format csv"
+
+    # Perform scan
+    try:
+        log_message("INFO", f"Started full scan (duration: {duration}s) on interface {interface}.")
+
+        # Separate threads
+        scan_thread = threading.Thread(target=run_scan, args=(command,))
+        countdown_thread = threading.Thread(target=run_countdown, args=(duration, f"Scanning for {duration} seconds..."))
+
+        scan_thread.start()
+        countdown_thread.start()
+
+        scan_thread.join()
+        countdown_thread.join()
+        
+        # Cleanup non-CSV files
+        scan_cleanup(output_path)
+
+        click.echo(format_message("success", f"Scan complete. Results saved to: {filename_base}.csv"))
+        log_message("INFO", f"Full scan completed. File written: {filename_base}.csv")
+
+    except Exception as e:
+        click.echo(format_message("error", f"Scan failed: {str(e)}"))
+        log_message("ERROR", f"Full scan failed: {str(e)}")
 
 def scan_filter():
-    # TBC
-    print("Filter Scan")
-    pass
+    """Prompt user to select a BSSID and channel, then run a filtered scan."""
+
+    config = load_config()
+    scan_dir = config.get("scan_directory", "./scans/")
+    filename_template = config.get("file_naming", {}).get("target_scan", "wstt_filter-scan-{timestamp}.csv")
+    interface = get_selected_interface()
+
+    if not interface:
+        click.echo(format_message("error", "No interface selected. Please set an interface before scanning."))
+        return
+
+    # Find latest full scan
+    scan_files = sorted(
+        glob.glob(os.path.join(scan_dir, "wstt_full-scan-*.csv")),
+        key=os.path.getmtime,
+        reverse=True
+    )
+
+    if not scan_files:
+        click.echo(format_message("error", "No previous full scan CSV file found in ./scans/."))
+        return
+
+    latest_file = scan_files[0]
+
+    # Parse BSSID
+    access_points = []
+
+    try:
+        with open(latest_file, "r", encoding="utf-8", errors="ignore") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if not row:
+                    continue
+                if row[0].strip().lower() == "station mac":
+                    break
+                if len(row) > 13 and row[0].count(":") == 5:
+                    bssid = row[0].strip()
+                    channel = row[3].strip()
+                    essid = row[13].strip()
+                    access_points.append((bssid, channel, essid))
+    except Exception as e:
+        click.echo(format_message("error", f"Failed to parse scan file: {str(e)}"))
+        return
+
+    if not access_points:
+        click.echo(format_message("warning", "No access points found in the most recent scan file."))
+        return
+
+    # Display AP table
+    click.echo(format_message("title", "Filtered Traffic Scan"))
+
+    table_data = []
+    for idx, (bssid, channel, essid) in enumerate(access_points, start=1):
+        table_data.append([idx, bssid, channel, essid or "<Hidden ESSID>"])
+
+    headers = ["No.", "BSSID", "Channel", "ESSID"]
+    table = tabulate(table_data, headers=headers, tablefmt="plain")
+    click.echo(table)
+    click.echo()
+
+    # Prompt: AP
+    choice = click.prompt("Enter number of target access point", type=click.IntRange(1, len(access_points)))
+    selected_bssid, selected_channel, selected_essid = access_points[choice - 1]
+
+    # Prompt: Scan duration
+    duration = click.prompt("Enter scan duration in seconds", type=int)
+
+    # Prepare file path
+    os.makedirs(scan_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    filename_base = filename_template.replace("{timestamp}", timestamp).replace(".csv", "")
+    output_path = os.path.join(scan_dir, filename_base)
+
+    # Build airodump command
+    command = (
+        f"sudo timeout {duration} airodump-ng {interface} "
+        f"--bssid {selected_bssid} --channel {selected_channel} "
+        f"--write {output_path} --output-format csv"
+    )
+
+    # Perform scan
+    try:
+        log_message("INFO", f"Started filtered scan on BSSID {selected_bssid} (CH {selected_channel}) for {duration}s.")
+
+        # Separate threads
+        scan_thread = threading.Thread(target=run_scan, args=(command,))
+        countdown_thread = threading.Thread(target=run_countdown, args=(duration, f"Scanning for {duration} seconds..."))
+
+        scan_thread.start()
+        countdown_thread.start()
+
+        scan_thread.join()
+        countdown_thread.join()
+
+        # Cleanup non-CSV files
+        scan_cleanup(output_path)
+
+        click.echo(format_message("success", f"Scan complete. Results saved to: {filename_base}.csv"))
+        log_message("INFO", f"Filtered scan complete. File written: {filename_base}.csv")
+
+    except Exception as e:
+        click.echo(format_message("error", f"Scan failed: {str(e)}"))
+        log_message("ERROR", f"Filtered scan failed: {str(e)}")

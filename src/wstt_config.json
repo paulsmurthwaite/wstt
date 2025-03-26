@@ -1,11 +1,11 @@
 {
-    "interface": "wlx00c0cab4b58c",
+    "interface": "wlx00c0cab68175",
     "log_file": "./logs/wstt.log",
     "scan_directory": "./scans/",
     "capture_directory": "./caps/",
     "file_naming": {
         "full_scan": "wstt_full-scan-{timestamp}.csv",
-        "target_scan": "wstt_target-scan-{timestamp}.csv"
+        "target_scan": "wstt_filter-scan-{timestamp}.csv"
     },
     "time_control": {
         "options": [
