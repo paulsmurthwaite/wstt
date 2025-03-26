@@ -1,5 +1,5 @@
 {
-    "interface": "wlx00c0cab68175",
+    "interface": "wlx00c0cab4b58c",
     "log_file": "./logs/wstt.log",
     "scan_directory": "./scans/",
     "capture_directory": "./caps/",
