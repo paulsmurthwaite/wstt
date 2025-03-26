@@ -1,17 +1,22 @@
 # Wireless Security Testing Toolkit (WSTT)
 
 ## **Overview**
-WSTT provides a single commmand for managing wireless network interfaces, enabling monitor mode, resetting interfaces, and checking interface status.
+WSTT provides a modular command-line interface for managing wireless interfaces, enabling monitor mode, scanning for access points, and performing filtered or full wireless scans.
 
-The tools simplifies the process of switching between **managed** and **monitor** modes, commonly required for security testing and packet analysis.
+The toolkit simplifies the process of switching between **managed** and **monitor** modes, resetting interfaces, performing wireless traffic scans, and preparing for further analysis or capture.
 
 ---
 
 ## **Features**
-- Enable **Monitor Mode** for packet capture and security testing  
-- Enable **Managed Mode** for normal Wi-Fi usage  
-- **Reset Wireless Interface** (down/up cycle without changing mode)  
-- **Check Current Interface Status**  
+- Enable **Monitor Mode** for wireless packet scanning  
+- Enable **Managed Mode** for normal Wi-Fi operation  
+- **Reset Wireless Interface** (soft or hard reset options)  
+- **Check Current Interface Details**  
+- Perform **Full Wireless Scans** with output saved to `.csv`  
+- Perform **Filtered Wireless Scans** (by BSSID and channel) using previously captured data  
+- Output filenames and directories are configurable via `wstt_config.json`  
+- Real-time countdown display for scans  
+- Logging of all scan actions and errors to `wstt.log`
 
 ---
 
@@ -20,7 +25,7 @@ The tools simplifies the process of switching between **managed** and **monitor*
 Before using WSTT, ensure you have the required dependencies installed:
 ```bash
 sudo apt update
-sudo apt install iw iproute2
+sudo apt install iw iproute2 aircrack-ng
 ```
 
 ### Clone the repository
@@ -37,91 +42,73 @@ chmod +x wstt_interface.py
 ---
 
 ## **Usage**
-The script accepts one interface at a time and provides various options.
+WSTT uses subcommands and interactive prompts.  
+Run the main script with one of the following commands:
 
-### General Syntax
+### View Available Interfaces
 ```bash
-./wstt_interface.py -i <interface> [options]
+./wstt_interface.py get
 ```
 
-### Enable Monitor Mode
+### Set Wireless Interface
 ```bash
-./wstt_interface.py -i wlan0 -m monitor
+./wstt_interface.py set
 ```
 
-**Expected Output**
+### Show Current Interface Details
 ```bash
-[INFO] Interface wlan0 is now down.
-[INFO] Changing wlan0 to Monitor mode...
-[INFO] Interface wlan0 is now up.
-[SUCCESS] wlan0 is set to Monitor mode.
+./wstt_interface.py show
 ```
 
-### Enable Managed Mode
+### Set Interface Mode
 ```bash
-./wstt_interface.py -i wlan0 -m managed
+./wstt_interface.py mode managed
+./wstt_interface.py mode monitor
 ```
 
-**Expected Output**
+### Reset Interface
 ```bash
-[INFO] Interface wlan0 is now down.
-[INFO] Changing wlan0 to Managed mode...
-[INFO] Interface wlan0 is now up.
-[SUCCESS] wlan0 is set to Managed mode.
+./wstt_interface.py reset soft
+./wstt_interface.py reset hard
 ```
 
-### Reset Interface (Down/Up Cycle)
+### Perform Full Scan (All Wireless Traffic)
 ```bash
-./wstt_interface.py -i wlan0 -r
+./wstt_interface.py scan full
 ```
+- Prompts for scan duration
+- Saves results to `./scans/wstt_full-scan-<timestamp>.csv`
 
-**Expected Output**
+### Perform Filtered Scan (Targeted by BSSID/Channel)
 ```bash
-[INFO] Interface wlan0 is now down.
-[INFO] Interface wlan0 is now up.
-[INFO] Interface wlan0 has been reset.
+./wstt_interface.py scan filter
 ```
-
-### Check Interface Status
-```bash
-./wstt_interface.py -i wlan0 -s
-```
-
-**Expected Output**
-```bash
-[INFO] wlan0 is currently set to Managed mode.
-```
-
----
-
-## **Exit Codes**
-| Code | Meaning                                   |
-| ---- | ----------------------------------------- |
-| `0`  | Success                                   |
-| `1`  | Error: Invalid Input or Execution Failure |
-| `2`  | Interface Not Found                       |
-
----
-
-## **Troubleshooting**
-- Error: ```Command not found: iw```
-- Solution: Install ```iw``` with:
-```bash
-sudo apt install iw
-```
-
-- Error: ```Interface not found```
-- Solution: Verify the correct interface name with:
-```bash
-ip link show
-```
+- Parses latest full scan file
+- Lets you select an AP (BSSID and channel)
+- Prompts for duration
+- Saves results to `./scans/wstt_filter-scan-<timestamp>.csv`
 
 ---
 
 ## **Logging**
-All actions and errors are logged to ```wstt.log```:
+All actions and errors are logged to `wstt.log` (path defined in `wstt_config.json`):
 ```bash
-tail -f wstt.log
+tail -f logs/wstt.log
+```
+
+---
+
+## **Configuration**
+WSTT uses a JSON-based configuration file: `wstt_config.json`
+
+Example entries:
+```json
+"scan_directory": "./scans/",
+"capture_directory": "./caps/",
+"file_naming": {
+  "full_scan": "wstt_full-scan-{timestamp}.csv",
+  "target_scan": "wstt_filter-scan-{timestamp}.csv"
+}
 ```
 
 ---
@@ -132,6 +119,6 @@ This project is licenced under the MIT Licence.
 ---
 
 ## **Author**
-- Paul Smurthwaite
-- 12 March 2025
+- Paul Smurthwaite  
+- 12 March 2025  
 - TM470-25B
