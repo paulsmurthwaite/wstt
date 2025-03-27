@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Filename goes here
+"""wstt_interface.py
 
 Information goes here
 
@@ -16,7 +16,8 @@ from wstt_utils import (
     show_interface,
     set_mode,
     reset_interface,
-    scan_interface
+    scan_interface,
+    capture_interface
 )
 
 @click.group()
@@ -31,6 +32,7 @@ cli.add_command(show_interface, name="show")
 cli.add_command(set_mode, name="mode")
 cli.add_command(reset_interface, name="reset")
 cli.add_command(scan_interface, name="scan")
+cli.add_command(capture_interface, name="capture")
 
 if __name__ == "__main__":
     cli()

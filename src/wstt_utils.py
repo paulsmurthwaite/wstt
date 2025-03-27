@@ -123,7 +123,7 @@ def set_interface(ctx):
             return
 
         click.echo(result.stdout)  # Display full output to the user
-        selected_interface = click.prompt("\nEnter the interface name to use (e.g., wlx00c0cab4b58c)", type=str)
+        selected_interface = click.prompt("[?] Enter the interface name to use (e.g., wlx00c0cab4b58c)", type=str)
 
         # Load existing config if available
         config = {}
@@ -426,6 +426,12 @@ def reset_interface(reset_type):
         log_message("ERROR", f"Failed to reset interface {interface}.")
         click.echo(format_message("error", "Failed to reset the interface. Check permissions and driver status."))
 
+# Check interface is in Monitor Mode
+
+def is_monitor_mode(interface):
+    """Check if the given interface is in Monitor mode."""
+    return get_mode(interface) == "Monitor"
+
 def run_scan(command):
     """Run scan subprocess with specified shell command."""
     try:
@@ -453,6 +459,80 @@ def scan_cleanup(base_path):
         if os.path.exists(target):
             os.remove(target)
 
+# ---Helper Functions---
+
+# Parse csv Helper
+
+def parse_scan_csv(file_path):
+    """
+    Parse an airodump-ng CSV scan file and return a list of access points as tuples:
+    (bssid, channel, essid)
+    """
+    access_points = []
+
+    try:
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if not row:
+                    continue
+                if row[0].strip().lower() == "station mac":
+                    break
+                if len(row) > 13 and row[0].count(":") == 5:
+                    bssid = row[0].strip()
+                    channel = row[3].strip()
+                    essid = row[13].strip()
+                    access_points.append((bssid, channel, essid))
+
+    except Exception as e:
+        click.echo(format_message("error", f"Failed to parse scan file: {str(e)}"))
+        log_message("ERROR", f"Failed to parse scan file {file_path}: {str(e)}")
+
+    return access_points
+
+
+# Get latest scan file
+
+def get_latest_scan_file(scan_dir, pattern):
+    """
+    Return the full path to the latest scan file matching the given pattern.
+    Example pattern: 'wstt_full-scan-*.csv' or 'wstt_filter-scan-*.csv'
+    """
+    try:
+        scan_files = sorted(
+            glob.glob(os.path.join(scan_dir, pattern)),
+            key=os.path.getmtime,
+            reverse=True
+        )
+        return scan_files[0] if scan_files else None
+    except Exception as e:
+        log_message("ERROR", f"Failed to locate latest scan file: {str(e)}")
+        return None
+
+
+# Set interface channel helper
+
+def set_channel(interface, channel):
+    """Set the wireless interface to a specific channel."""
+    try:
+        subprocess.run(
+            ["sudo", "iw", "dev", interface, "set", "channel", str(channel)],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        log_message("INFO", f"Interface {interface} set to channel {channel}")
+        return True
+    except subprocess.CalledProcessError:
+        click.echo(format_message("error", f"Failed to set channel {channel} on {interface}"))
+        log_message("ERROR", f"Channel set failed for {interface} → {channel}")
+        return False
+
+
+# ---Scan wireless traffic to csv---
+
+# CLI Command options and direction
+
 @click.command()
 @click.argument("scan_type", type=click.Choice(["full", "filter"], case_sensitive=False))
 def scan_interface(scan_type):
@@ -470,6 +550,11 @@ def scan_full():
 
     if not interface:
         click.echo(format_message("error", "No interface selected. Please set an interface before scanning."))
+        return
+
+    if not is_monitor_mode(interface):
+        click.echo(format_message("error", f"Interface {interface} is not in Monitor mode. Please set it before capturing."))
+        log_message("ERROR", f"Capture aborted. Interface {interface} is not in Monitor mode.")
         return   
 
     scan_dir = config.get("scan_directory", "./scans/")
@@ -480,7 +565,7 @@ def scan_full():
 
     # Prompt user for scan duration
     click.echo(format_message("title", "Full Traffic Scan"))
-    duration = click.prompt("Enter scan duration in seconds", type=int)
+    duration = click.prompt("[?] Enter scan duration in seconds", type=int)
 
     # Generate timestamped filename
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -490,8 +575,9 @@ def scan_full():
     # Build airodump-ng command
     command = f"sudo timeout {duration} airodump-ng {interface} --write {output_path} --output-format csv"
 
-    # Perform scan
+    # Run scan
     try:
+        click.echo(format_message("success", f"Scanning on Interface: {interface}"))
         log_message("INFO", f"Started full scan (duration: {duration}s) on interface {interface}.")
 
         # Separate threads
@@ -514,57 +600,45 @@ def scan_full():
         click.echo(format_message("error", f"Scan failed: {str(e)}"))
         log_message("ERROR", f"Full scan failed: {str(e)}")
 
+
 def scan_filter():
     """Prompt user to select a BSSID and channel, then run a filtered scan."""
 
     config = load_config()
+    interface = get_selected_interface()
+
     scan_dir = config.get("scan_directory", "./scans/")
     filename_template = config.get("file_naming", {}).get("filter_scan", "wstt_filter-scan-{timestamp}.csv")
-    interface = get_selected_interface()
+    os.makedirs(scan_dir, exist_ok=True)
 
     if not interface:
         click.echo(format_message("error", "No interface selected. Please set an interface before scanning."))
         return
-
-    # Find latest full scan
-    scan_files = sorted(
-        glob.glob(os.path.join(scan_dir, "wstt_full-scan-*.csv")),
-        key=os.path.getmtime,
-        reverse=True
-    )
-
-    if not scan_files:
-        click.echo(format_message("error", "No previous full scan CSV file found in ./scans/."))
+    
+    if not is_monitor_mode(interface):
+        click.echo(format_message("error", f"Interface {interface} is not in Monitor mode. Please set it before capturing."))
+        log_message("ERROR", f"Capture aborted. Interface {interface} is not in Monitor mode.")
         return
 
-    latest_file = scan_files[0]
+    # Locate most recent full scan csv
+    scan_dir = config.get("scan_directory", "./scans/")
+    pattern = config.get("file_naming", {}).get("full_scan", "wstt_full-scan-*.csv").replace("{timestamp}", "*")
+    latest_file = get_latest_scan_file(scan_dir, pattern)
 
-    # Parse BSSID
-    access_points = []
-
-    try:
-        with open(latest_file, "r", encoding="utf-8", errors="ignore") as f:
-            reader = csv.reader(f)
-            for row in reader:
-                if not row:
-                    continue
-                if row[0].strip().lower() == "station mac":
-                    break
-                if len(row) > 13 and row[0].count(":") == 5:
-                    bssid = row[0].strip()
-                    channel = row[3].strip()
-                    essid = row[13].strip()
-                    access_points.append((bssid, channel, essid))
-    except Exception as e:
-        click.echo(format_message("error", f"Failed to parse scan file: {str(e)}"))
+    if not latest_file:
+        click.echo(format_message("error", "No previous full scan CSV file found. Please run a full scan first."))
         return
+
+    # Parse csv
+    access_points = parse_scan_csv(latest_file)
 
     if not access_points:
         click.echo(format_message("warning", "No access points found in the most recent scan file."))
         return
-
+    
     # Display AP table
-    click.echo(format_message("title", "Filtered Traffic Scan"))
+    click.echo(format_message("title", "Available Access Points"))
+    click.echo("→")
 
     table_data = []
     for idx, (bssid, channel, essid) in enumerate(access_points, start=1):
@@ -576,11 +650,11 @@ def scan_filter():
     click.echo()
 
     # Prompt: AP
-    choice = click.prompt("Enter number of target access point", type=click.IntRange(1, len(access_points)))
+    choice = click.prompt("[?] Select Target Access Point", type=click.IntRange(1, len(access_points)))
     selected_bssid, selected_channel, selected_essid = access_points[choice - 1]
 
     # Prompt: Scan duration
-    duration = click.prompt("Enter scan duration in seconds", type=int)
+    duration = click.prompt("[?] Enter scan duration in seconds", type=int)
 
     # Prepare file path
     os.makedirs(scan_dir, exist_ok=True)
@@ -595,8 +669,9 @@ def scan_filter():
         f"--write {output_path} --output-format csv"
     )
 
-    # Perform scan
+    # Run scan
     try:
+        click.echo(format_message("success", f"Scanning on Interface: {interface} | Target BSSID: {selected_bssid} | Channel: {selected_channel} | Duration: {duration} seconds."))  
         log_message("INFO", f"Started filtered scan on BSSID {selected_bssid} (CH {selected_channel}) for {duration}s.")
 
         # Separate threads
@@ -618,3 +693,182 @@ def scan_filter():
     except Exception as e:
         click.echo(format_message("error", f"Scan failed: {str(e)}"))
         log_message("ERROR", f"Filtered scan failed: {str(e)}")
+
+
+# ---Capture wireless traffic to PCAP---
+
+# CLI Command options and direction
+
+@click.command()
+@click.argument("capture_type", type=click.Choice(["full", "filter"], case_sensitive=False))
+def capture_interface(capture_type):
+    """Start a wireless traffic scan."""
+    if capture_type == "full":
+        capture_full()
+    elif capture_type == "filter":
+        capture_filter()
+
+# Packet capture subprocess
+
+def run_capture(command):
+    """Run packet capture subprocess using provided command list."""
+    try:
+        subprocess.run(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception as e:
+        click.echo(format_message("error", f"Capture execution failed: {str(e)}"))
+        log_message("ERROR", f"Capture execution failed: {str(e)}")
+
+# Packet capture - Full
+
+def capture_full():
+    """Capture all wireless traffic and write to PCAP."""
+
+    config = load_config()
+    interface = get_selected_interface()
+
+    if not interface:
+        click.echo(format_message("error", "No interface selected. Please set an interface before capturing."))
+        return
+    
+    if not is_monitor_mode(interface):
+        click.echo(format_message("error", f"Interface {interface} is not in Monitor mode. Please set it before capturing."))
+        log_message("ERROR", f"Capture aborted. Interface {interface} is not in Monitor mode.")
+        return
+
+    cap_dir = config.get("capture_directory", "./caps/")
+    filename_template = config.get("file_naming", {}).get("full_cap", "wstt_full-cap-{timestamp}.pcap")
+    os.makedirs(cap_dir, exist_ok=True)  # Ensure output directory exists
+
+    # Prompt user for capture control method
+    click.echo(format_message("title", "Full Packet Capture"))
+    method = click.prompt("[?] Select capture control method: [D]uration | [P]ackets", type=str).strip().lower()
+
+    duration = None
+    max_packets = None
+
+    if method == "d":
+        duration = click.prompt("[?] Enter Duration (seconds)", type=int)
+    elif method == "p":
+        max_packets = click.prompt("[?] Enter Packets (number)", type=int)
+    else:
+        click.echo(format_message("error", "Invalid capture method selected."))
+        return
+
+    # Generate timestamped filename
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    filename = filename_template.replace("{timestamp}", timestamp)
+    output_path = os.path.join(cap_dir, filename)
+
+    # Build tcpdump command using native duration or count handling
+    if duration:
+        command = f"sudo timeout {duration} tcpdump -i {interface} -w {output_path}"
+    else:
+        command = f"sudo tcpdump -i {interface} -w {output_path} -c {max_packets}"
+
+    # Run capture
+    try:
+        click.echo(format_message("success", f"Capturing on Interface: {interface}"))
+        log_message("INFO", f"Starting full capture on {interface}. Output: {output_path}")
+        run_capture(command)
+        click.echo(format_message("success", f"Capture complete. File saved to: {filename}"))
+        log_message("INFO", f"Full capture complete. File written: {filename}")
+
+    except Exception as e:
+        click.echo(format_message("error", f"Capture failed: {str(e)}"))
+        log_message("ERROR", f"Full capture failed: {str(e)}")
+
+# Packet capture - Filtered
+
+def capture_filter():
+    """Capture traffic from a specific BSSID and write to PCAP."""
+
+    config = load_config()
+    interface = get_selected_interface()
+
+    cap_dir = config.get("capture_directory", "./caps/")
+    filename_template = config.get("file_naming", {}).get("filter_cap", "wstt_filter-cap-{timestamp}.pcap")
+    os.makedirs(cap_dir, exist_ok=True)  # Ensure output directory exists
+
+    if not interface:
+        click.echo(format_message("error", "No interface selected. Please set an interface before capturing."))
+        return
+
+    if not is_monitor_mode(interface):
+        click.echo(format_message("error", f"Interface {interface} is not in Monitor mode. Please set it before capturing."))
+        return
+
+    # Locate most recent full scan csv
+    scan_dir = config.get("scan_directory", "./scans/")
+    pattern = config.get("file_naming", {}).get("full_scan", "wstt_full-scan-*.csv").replace("{timestamp}", "*")
+    latest_file = get_latest_scan_file(scan_dir, pattern)
+
+    if not latest_file:
+        click.echo(format_message("error", "No previous full scan CSV file found. Please run a full scan first."))
+        return
+
+    # Parse csv
+    access_points = parse_scan_csv(latest_file)
+
+    if not access_points:
+        click.echo(format_message("warning", "No access points found in the most recent scan file."))
+        return
+
+    # Display AP table
+    click.echo(format_message("title", "Available Access Points"))
+    click.echo("→")
+
+    table_data = []
+    for idx, (bssid, channel, essid) in enumerate(access_points, start=1):
+        table_data.append([idx, bssid, channel, essid or "<Hidden ESSID>"])
+
+    headers = ["No.", "BSSID", "Channel", "ESSID"]
+    table = tabulate(table_data, headers=headers, tablefmt="plain")
+    click.echo(table)
+    click.echo()
+
+    # Prompt: AP
+    choice = click.prompt("[?] Select Target Access Point", type=click.IntRange(1, len(access_points)))
+    selected_bssid, selected_channel, selected_essid = access_points[choice - 1]
+
+    # Set channel
+    if not set_channel(interface, selected_channel):
+        return
+
+    # Prompt user for capture control method
+    click.echo(format_message("title", "Filtered Packet Capture"))
+    click.echo("→")
+    method = click.prompt("[?] Select capture control method: [D]uration | [P]ackets", type=str).strip().lower()
+
+    duration = None
+    max_packets = None
+
+    if method == "d":
+        duration = click.prompt("[?] Enter Duration (seconds)", type=int)
+    elif method == "p":
+        max_packets = click.prompt("[?] Enter Packets (number)", type=int)
+    else:
+        click.echo(format_message("error", "Invalid capture method selected."))
+        return
+
+    # Generate timestamped filename
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    filename = filename_template.replace("{timestamp}", timestamp)
+    output_path = os.path.join(cap_dir, filename)
+
+    # Build tcpdump command with BPF filter
+    if duration:
+        command = f"sudo timeout {duration} tcpdump -i {interface} -w {output_path} wlan host {selected_bssid}"
+    else:
+        command = f"sudo tcpdump -i {interface} -w {output_path} -c {max_packets} wlan host {selected_bssid}"
+
+    # Run capture
+    try:
+        click.echo(format_message("success", f"Capturing on Interface: {interface} | Target BSSID: {selected_bssid} | Channel: {selected_channel}"))       
+        log_message("INFO", f"Starting filtered capture on {interface} → {selected_bssid} (channel {selected_channel})")
+        run_capture(command)
+        click.echo(format_message("success", f"Capture complete. File saved to: {filename}"))
+        log_message("INFO", f"Filtered capture complete. File written: {filename}")
+
+    except Exception as e:
+        click.echo(format_message("error", f"Filtered capture failed: {str(e)}"))
+        log_message("ERROR", f"Filtered capture failed: {str(e)}")
