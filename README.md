@@ -107,7 +107,6 @@ Example entries:
 "capture_directory": "./caps/",
 "file_naming": {
   "full_scan": "wstt_full-scan-{timestamp}.csv",
-  "full_scan": "wstt_full-scan-{timestamp}.csv",
   "filter_scan": "wstt_filter-scan-{timestamp}.csv",
   "full_cap": "wstt_full-cap-{timestamp}.pcap",
   "filter_cap": "wstt_filter-cap-{timestamp}.pcap"
