@@ -519,7 +519,7 @@ def scan_filter():
 
     config = load_config()
     scan_dir = config.get("scan_directory", "./scans/")
-    filename_template = config.get("file_naming", {}).get("target_scan", "wstt_filter-scan-{timestamp}.csv")
+    filename_template = config.get("file_naming", {}).get("filter_scan", "wstt_filter-scan-{timestamp}.csv")
     interface = get_selected_interface()
 
     if not interface:

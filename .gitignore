@@ -10,14 +10,15 @@ __pycache__/
 *.log
 *.pytest_cache/
 *.csv
+*.pcap
 
 # Ignore local backups & other files
 wstt-backup_*/
 *.sh
 *.txt
 
-# Ignore old versions
-niu/
+# Ignore legacy files
+legacy/
 
 # Ignore VS Code settings (optional)
 .vscode/
