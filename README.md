@@ -1,7 +1,7 @@
 # Wireless Security Testing Toolkit (WSTT)
 
 ## **Overview**
-WSTT provides a modular command-line interface for managing wireless interfaces, enabling monitor mode, scanning for access points, and performing filtered or full wireless scans.
+WSTT provides a modular command-line interface for managing wireless interfaces, enabling monitor mode, scanning for access points, and performing filtered or full wireless scans and packet captures.
 
 The toolkit simplifies the process of switching between **managed** and **monitor** modes, resetting interfaces, performing wireless traffic scans, and preparing for further analysis or capture.
 
@@ -107,7 +107,10 @@ Example entries:
 "capture_directory": "./caps/",
 "file_naming": {
   "full_scan": "wstt_full-scan-{timestamp}.csv",
-  "target_scan": "wstt_filter-scan-{timestamp}.csv"
+  "full_scan": "wstt_full-scan-{timestamp}.csv",
+  "filter_scan": "wstt_filter-scan-{timestamp}.csv",
+  "full_cap": "wstt_full-cap-{timestamp}.pcap",
+  "filter_cap": "wstt_filter-cap-{timestamp}.pcap"
 }
 ```
 

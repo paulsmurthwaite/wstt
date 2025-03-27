@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.5.0] - 2025-03-27
+### Added
+- `capture_full` function:
+  - Prompts for duration or packet count
+  - Launches `tcpdump` using `timeout` or `-c`
+  - Saves results to `wstt_full-cap-{timestamp}.pcap`
+- `capture_filter` function:
+  - Parses latest filtered scan CSV for BSSID/channel
+  - Prompts for target AP and capture method
+  - Sets channel via `iw` and filters using BPF `wlan host <bssid>`
+  - Saves results to `wstt_filter-cap-{timestamp}.pcap`
+- Shared subprocess runner `run_capture()`
+- Wireless channel setter `set_channel()`
+- CSV parser `parse_scan_csv()` for reusability
+- File lookup helper `get_latest_scan_file()`
+
+### Changed
+- Refactored scan and capture logic to ensure:
+  - Consistent formatting, prompts, and tabulated AP display
+  - Shared interface state checking and directory creation
+  - Reuse of helper functions across commands
+
+---
+
 ## [0.4.0] - 2025-03-26
 ### Added
 - `scan_filter` function with full support for:
