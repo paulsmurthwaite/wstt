@@ -5,8 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Output Directories
-SCN_DIR="$PROJECT_ROOT/scans"
-CAP_DIR="$PROJECT_ROOT/caps"
+SCN_DIR="$PROJECT_ROOT/output/scans"
+CAP_DIR="$PROJECT_ROOT/output/captures"
 
 # File naming convention
 TIMESTAMP=$(date +"%Y%m%d%H%M%S")
