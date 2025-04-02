@@ -7,14 +7,13 @@ __pycache__/
 *.pyo
 
 # Ignore test reports & logs
-*.log
 *.pytest_cache/
+*.log
 *.csv
 *.pcap
 
 # Ignore local backups & other files
-wstt-backup_*/
-*.sh
+*wstt_backup.*
 *.txt
 
 # Ignore legacy files
