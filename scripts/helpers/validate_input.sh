@@ -95,6 +95,7 @@ select_pcap_file() {
     # Single capture file
     elif [ "$num_files" -eq 1 ]; then
         selected_file="${files[0]}"
+        echo "" >&2
         echo "[INFO] Capture file found → $(basename "$selected_file")" >&2
 
     # Multiple capture files
@@ -146,21 +147,22 @@ select_csv_file() {
     # Check file qty
     local num_files=${#files[@]}
 
-    # No capture files
+    # No scan files
     if [ "$num_files" -eq 0 ]; then
         echo "[ERROR] No .csv scan files found in $SCN_DIR" >&2
         return 1
 
-    # Single capture file
+    # Single scan file
     elif [ "$num_files" -eq 1 ]; then
         selected_file="${files[0]}"
-        echo "[INFO] Only one scan file found → $(basename "$selected_file")" >&2
+        echo "" >&2
+        echo "[INFO] Scan file found → $(basename "$selected_file")" >&2
 
-    # Multiple capture files
+    # Multiple scan files
     else
         echo "" >&2
-        echo "[ Capture Files ]" >&2
-        echo "[+] Select capture file:" >&2
+        echo "[ Scan Files ]" >&2
+        echo "[+] Select scan file:" >&2
         for i in "${!files[@]}"; do
             echo "    [$((i+1))] $(basename "${files[$i]}")" >&2
         done

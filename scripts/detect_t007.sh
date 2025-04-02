@@ -1,17 +1,17 @@
 #!/bin/bash
 
-# T001 – Unencrypted Traffic Detection
-# Scans a .pcap file for unencrypted protocols: HTTP, FTP, POP3, IMAP
+# T007 – Deauthentication Flood Detection
+# Scans for a high volume of 802.11 deauth frames (subtype 12)
 
-# Usage: ./detect_t001.sh
-# Requires: tshark
+# Usage: ./detect_t007.sh
+# Requires: .pcap capture file, tshark
 
 source ./config.sh
 source ./helpers/validate_input.sh
 
 # Header
 echo ""
-echo "[ T001 – Unencrypted Traffic Detection ]"
+echo "[ T007 – Deauthentication Flood Detection ]"
 
 # Select detection mode
 echo ""
@@ -37,24 +37,16 @@ if [ "$DETECT_MODE" = "1" ]; then
     echo ""
 
     # Run detection
-    MATCHING=$(tshark -r "$PCAP_FILE" \
-        -Y "http || ftp || pop || imap" \
-        -T fields \
-        -e frame.number \
-        -e frame.time_relative \
-        -e ip.src \
-        -e ip.dst -e \
-        _ws.col.Protocol \
-        2>/dev/null)
+    DEAUTH_COUNT=$(tshark -r "$PCAP_FILE" -Y "wlan.fc.type_subtype == 12" 2>/dev/null | wc -l)
 
     # Output result
-    if [ -z "$MATCHING" ]; then
-        echo "[RESULT] PASS – No unencrypted traffic detected"
+    if [ "$DEAUTH_COUNT" -gt 100 ]; then
+        echo "[RESULT] FAIL – Deauthentication flood likely detected"
+        echo "         Count: $DEAUTH_COUNT deauth frames"
+    elif [ "$DEAUTH_COUNT" -gt 0 ]; then
+        echo "[RESULT] WARNING – Some deauth frames observed (Count: $DEAUTH_COUNT)"
     else
-        echo "[RESULT] FAIL – Unencrypted traffic found"
-        echo "--------------------------------------------------"
-        echo "$MATCHING"
-        echo "--------------------------------------------------"
+        echo "[RESULT] PASS – No deauthentication frames found"
     fi
     echo ""
 
@@ -65,7 +57,7 @@ elif [ "$DETECT_MODE" = "2" ]; then
     echo "    → $(basename "$PCAP_FILE")"
     echo ""
 
-    # Run detection: python3 ./analysis/detect_t001.py "$PCAP_FILE"
+    # Run detection: python3 ./analysis/detect_t007.py "$PCAP_FILE"
     echo "[WARNING] Advanced detection not yet implemented."
     exit 1
 fi

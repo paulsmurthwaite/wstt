@@ -1,17 +1,17 @@
 #!/bin/bash
 
-# T001 – Unencrypted Traffic Detection
-# Scans a .pcap file for unencrypted protocols: HTTP, FTP, POP3, IMAP
+# T015 – Malicious Hotspot Auto-Connect Detection
+# Lists clients sending association requests to SSIDs
 
-# Usage: ./detect_t001.sh
-# Requires: tshark
+# Usage: ./detect_t014.sh
+# Requires: .pcap capture file, tshark
 
 source ./config.sh
 source ./helpers/validate_input.sh
 
 # Header
 echo ""
-echo "[ T001 – Unencrypted Traffic Detection ]"
+echo "[ T015 – Malicious Hotspot Auto-Connect Detection ]"
 
 # Select detection mode
 echo ""
@@ -36,26 +36,24 @@ if [ "$DETECT_MODE" = "1" ]; then
     echo "    → $(basename "$PCAP_FILE")"
     echo ""
 
-    # Run detection
-    MATCHING=$(tshark -r "$PCAP_FILE" \
-        -Y "http || ftp || pop || imap" \
-        -T fields \
-        -e frame.number \
-        -e frame.time_relative \
-        -e ip.src \
-        -e ip.dst -e \
-        _ws.col.Protocol \
-        2>/dev/null)
+    echo "[RESULT] Client association attempts (Auto-connect candidates):"
+    echo "--------------------------------------------------"
 
-    # Output result
-    if [ -z "$MATCHING" ]; then
-        echo "[RESULT] PASS – No unencrypted traffic detected"
-    else
-        echo "[RESULT] FAIL – Unencrypted traffic found"
-        echo "--------------------------------------------------"
-        echo "$MATCHING"
-        echo "--------------------------------------------------"
-    fi
+    # Run detection
+    tshark -r "$PCAP_FILE" \
+        -Y "wlan.fc.type_subtype == 0" \
+        -T fields -e wlan.sa -e wlan.ssid 2>/dev/null |
+    awk '
+    {
+        mac = $1
+        ssid = $2
+        if (mac != "") {
+            if (ssid == "") ssid = "[Hidden or Unknown]"
+            printf "  Client: %-17s → SSID: %s\n", mac, ssid
+        }
+    }'
+
+    echo "--------------------------------------------------"
     echo ""
 
 # Advanced detection
@@ -65,7 +63,7 @@ elif [ "$DETECT_MODE" = "2" ]; then
     echo "    → $(basename "$PCAP_FILE")"
     echo ""
 
-    # Run detection: python3 ./analysis/detect_t001.py "$PCAP_FILE"
+    # Run detection: python3 ./analysis/detect_t015.py "$PCAP_FILE"
     echo "[WARNING] Advanced detection not yet implemented."
     exit 1
 fi

@@ -1,17 +1,17 @@
 #!/bin/bash
 
-# T001 – Unencrypted Traffic Detection
-# Scans a .pcap file for unencrypted protocols: HTTP, FTP, POP3, IMAP
+# T008 – Beacon Flood Detection
+# Counts excessive 802.11 beacon frames in a .pcap capture
 
-# Usage: ./detect_t001.sh
-# Requires: tshark
+# Usage: ./detect_t008.sh
+# Requires: .pcap capture file, tshark
 
 source ./config.sh
 source ./helpers/validate_input.sh
 
 # Header
 echo ""
-echo "[ T001 – Unencrypted Traffic Detection ]"
+echo "[ T008 – Beacon Flood Detection ]"
 
 # Select detection mode
 echo ""
@@ -37,24 +37,20 @@ if [ "$DETECT_MODE" = "1" ]; then
     echo ""
 
     # Run detection
-    MATCHING=$(tshark -r "$PCAP_FILE" \
-        -Y "http || ftp || pop || imap" \
-        -T fields \
-        -e frame.number \
-        -e frame.time_relative \
-        -e ip.src \
-        -e ip.dst -e \
-        _ws.col.Protocol \
-        2>/dev/null)
+    # Count number of beacon frames (type_subtype == 8)
+    BEACON_COUNT=$(tshark -r "$PCAP_FILE" -Y "wlan.fc.type_subtype == 8" 2>/dev/null | wc -l)
+
+    # Define a threshold for flagging
+    THRESHOLD=500
 
     # Output result
-    if [ -z "$MATCHING" ]; then
-        echo "[RESULT] PASS – No unencrypted traffic detected"
+    if [ "$BEACON_COUNT" -gt "$THRESHOLD" ]; then
+        echo "[RESULT] FAIL – Beacon flood likely detected"
+        echo "         Count: $BEACON_COUNT beacon frames"
+    elif [ "$BEACON_COUNT" -gt 0 ]; then
+        echo "[RESULT] WARNING – Beacons observed (Count: $BEACON_COUNT)"
     else
-        echo "[RESULT] FAIL – Unencrypted traffic found"
-        echo "--------------------------------------------------"
-        echo "$MATCHING"
-        echo "--------------------------------------------------"
+        echo "[RESULT] PASS – No beacon frames found"
     fi
     echo ""
 
@@ -65,7 +61,7 @@ elif [ "$DETECT_MODE" = "2" ]; then
     echo "    → $(basename "$PCAP_FILE")"
     echo ""
 
-    # Run detection: python3 ./analysis/detect_t001.py "$PCAP_FILE"
+    # Run detection: python3 ./analysis/detect_t008.py "$PCAP_FILE"
     echo "[WARNING] Advanced detection not yet implemented."
     exit 1
 fi

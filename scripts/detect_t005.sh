@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# T002 – Probe Request Snooping Detection
-# Analyses scan .csv file for clients probing for known SSIDs
+# T005 – Open Rogue Access Point
+# Identifies APs with open (unencrypted) networks (Encryption == OPN)
 
-# Usage: ./detect_t002.sh
+# Usage: ./detect_t005.sh
 # Requires: scan csv file
 
 source ./config.sh
@@ -11,7 +11,7 @@ source ./helpers/validate_input.sh
 
 # Header
 echo ""
-echo "[ T002 – Probe Request Snooping Detection ]"
+echo "[ T005 – Open Rogue Access Point Detection ]"
 
 # Select detection mode
 echo ""
@@ -36,22 +36,28 @@ if [ "$DETECT_MODE" = "1" ]; then
     echo "    → $(basename "$CSV_FILE")"
     echo ""
 
-    # Run detection & output result
-    echo "[RESULT] Clients broadcasting probe requests:"
+    echo "[RESULT] Detected Open (Unencrypted) Access Points:"
     echo "--------------------------------------------------"
-   
-    awk 'BEGIN {section=0}
-         /^$/ {section++}
-         section==2 && NF > 0 {
-            split($0, fields, ",")
-            mac=fields[1]
-            essids=fields[NF]
-            if (essids != "") {
-                gsub(/^ +| +$/, "", mac)
-                gsub(/^ +| +$/, "", essids)
-                printf "  %s  →  %s\n", mac, essids
+
+    # Parse and output result
+    awk -F',' '
+        BEGIN { section=1 }
+        /^$/ { section++; next }
+        section==1 && NF > 14 {
+            ssid=$14
+            bssid=$1
+            channel=$4
+            encryption=$6
+            gsub(/^ +| +$/, "", ssid)
+            gsub(/^ +| +$/, "", bssid)
+            gsub(/^ +| +$/, "", channel)
+            gsub(/^ +| +$/, "", encryption)
+
+            if (encryption == "OPN") {
+                printf "  SSID: %-20s | BSSID: %-17s | Channel: %s\n", ssid, bssid, channel
             }
-         }' "$CSV_FILE"
+        }
+    ' "$CSV_FILE"
 
     echo "--------------------------------------------------"
     echo ""
@@ -63,7 +69,7 @@ elif [ "$DETECT_MODE" = "2" ]; then
     echo "    → $(basename "$CSV_FILE")"
     echo ""
 
-    # Run detection: python3 ./analysis/detect_t002.py "$CSV_FILE"
+    # Run detection: python3 ./analysis/detect_t005.py "$CSV_FILE"
     echo "[WARNING] Advanced detection not yet implemented."
     exit 1
 fi

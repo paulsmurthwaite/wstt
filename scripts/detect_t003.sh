@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# T002 – Probe Request Snooping Detection
-# Analyses scan .csv file for clients probing for known SSIDs
+# T003 – SSID Harvesting Detection
+# Extracts unique SSIDs probed by client devices
 
-# Usage: ./detect_t002.sh
+# Usage: ./detect_t003.sh
 # Requires: scan csv file
 
 source ./config.sh
@@ -11,7 +11,7 @@ source ./helpers/validate_input.sh
 
 # Header
 echo ""
-echo "[ T002 – Probe Request Snooping Detection ]"
+echo "[ T003 – SSID Harvesting Detection ]"
 
 # Select detection mode
 echo ""
@@ -31,27 +31,33 @@ validate_csv_file "$CSV_FILE" || exit 1
 
 # Basic detection
 if [ "$DETECT_MODE" = "1" ]; then
-    echo ""
+    printf "\n"
     echo "[INFO] Running basic detection on:"
     echo "    → $(basename "$CSV_FILE")"
     echo ""
 
-    # Run detection & output result
-    echo "[RESULT] Clients broadcasting probe requests:"
+    echo "[RESULT] Probed SSIDs (Harvested from client requests):"
     echo "--------------------------------------------------"
-   
-    awk 'BEGIN {section=0}
-         /^$/ {section++}
-         section==2 && NF > 0 {
-            split($0, fields, ",")
-            mac=fields[1]
-            essids=fields[NF]
-            if (essids != "") {
-                gsub(/^ +| +$/, "", mac)
-                gsub(/^ +| +$/, "", essids)
-                printf "  %s  →  %s\n", mac, essids
+
+    # Parse
+    awk -F',' '
+        BEGIN { section=0 }
+        /^$/ { section++ }
+        section==2 && NF > 0 {
+            ssids=$NF
+            split(ssids, essid_list, /[;|]/)
+            for (i in essid_list) {
+                gsub(/^ +| +$/, "", essid_list[i])
+                if (essid_list[i] != "")
+                    seen[essid_list[i]]++
             }
-         }' "$CSV_FILE"
+        }
+        END {
+            for (ssid in seen) {
+                print "  → " ssid
+            }
+        }
+    ' "$CSV_FILE" | sort
 
     echo "--------------------------------------------------"
     echo ""
@@ -63,7 +69,7 @@ elif [ "$DETECT_MODE" = "2" ]; then
     echo "    → $(basename "$CSV_FILE")"
     echo ""
 
-    # Run detection: python3 ./analysis/detect_t002.py "$CSV_FILE"
+    # Run detection: python3 ./analysis/detect_t003.py "$CSV_FILE"
     echo "[WARNING] Advanced detection not yet implemented."
     exit 1
 fi
