@@ -1,31 +1,42 @@
 # Wireless Security Testing Toolkit (WSTT)
 
 ## **Overview**
-WSTT provides a modular command-line interface for managing wireless interfaces, enabling monitor mode, scanning for access points, and performing filtered or full wireless scans and packet captures.
+WSTT provides a modular command-line interface for managing wireless interfaces, enabling monitor mode, scanning for access points, capturing traffic, and detecting wireless security threats.
 
-The toolkit simplifies the process of switching between **managed** and **monitor** modes, resetting interfaces, performing wireless traffic scans, and preparing for further analysis or capture.
+The toolkit simplifies the process of switching between **managed** and **monitor** modes, scanning for wireless traffic, and analysing common wireless attacks through automated detection scripts.
 
 ---
 
 ## **Features**
-- Enable **Monitor Mode** for wireless packet scanning  
-- Enable **Managed Mode** for normal Wi-Fi operation  
-- **Reset Wireless Interface** (soft or hard reset options)  
-- **Check Current Interface Details**  
-- Perform **Full Wireless Scans** with output saved to `.csv`  
-- Perform **Filtered Wireless Scans** (by BSSID and channel) using previously captured data  
-- Output filenames and directories are configurable via `wstt_config.json`  
-- Real-time countdown display for scans  
-- Logging of all scan actions and errors to `wstt.log`
+- Enable **Monitor Mode** and **Managed Mode**
+- **Soft/Hard Reset** wireless interfaces
+- View and select available wireless interfaces
+- Perform **Full or Filtered Scans** using `airodump-ng`
+- Capture **Full or Filtered Packet Dumps** using `tcpdump`
+- Automatically detect threats in `.pcap` and `.csv` files:
+  - T001: Unencrypted Traffic
+  - T002: Probe Request Snooping
+  - T003: SSID Harvesting
+  - T004: Evil Twin AP
+  - T005: Open Rogue AP
+  - T006: Misconfigured AP
+  - T007: Deauthentication Flood
+  - T008: Beacon Flood
+  - T009: Authentication Flood
+  - T014: ARP Spoofing
+  - T015: Malicious Hotspot Auto-Connect
+  - T016: Directed Probe Response
+- All detection scripts include:
+  - **Basic Detection Mode** (CLI/Bash)
+  - Placeholder for **Advanced Detection Mode** (Python)
 
 ---
 
 ## **Installation**
 ### **Prerequisites**
-Before using WSTT, ensure you have the required dependencies installed:
 ```bash
 sudo apt update
-sudo apt install iw iproute2 aircrack-ng
+sudo apt install iw iproute2 aircrack-ng tshark tcpdump
 ```
 
 ### Clone the repository
@@ -34,84 +45,45 @@ git clone https://github.com/your-repo/wstt.git
 cd wstt
 ```
 
-### Make the script executable
+### Make scripts executable
 ```bash
-chmod +x wstt_interface.py
+chmod +x scripts/*.sh
+chmod +x helpers/*.sh
 ```
 
 ---
 
-## **Usage**
-WSTT uses subcommands and interactive prompts.  
-Run the main script with one of the following commands:
+## **Usage Overview**
+Run capture or scan scripts from the `scripts/` directory:
 
-### View Available Interfaces
 ```bash
-./wstt_interface.py get
+./scripts/scan.sh       # Full or filtered scan
+./scripts/capture.sh    # Full or filtered packet capture
+./scripts/detect_t001.sh  # Run specific threat detection (e.g. T001)
 ```
 
-### Set Wireless Interface
-```bash
-./wstt_interface.py set
-```
+---
 
-### Show Current Interface Details
-```bash
-./wstt_interface.py show
-```
+## **Detection Modes**
+Each detection script supports:
+- `[1] Basic`: Lightweight Bash-based detection
+- `[2] Advanced`: Placeholder for Python-based analysis
 
-### Set Interface Mode
-```bash
-./wstt_interface.py mode managed
-./wstt_interface.py mode monitor
-```
-
-### Reset Interface
-```bash
-./wstt_interface.py reset soft
-./wstt_interface.py reset hard
-```
-
-### Perform Full Scan (All Wireless Traffic)
-```bash
-./wstt_interface.py scan full
-```
-- Prompts for scan duration
-- Saves results to `./scans/wstt_full-scan-<timestamp>.csv`
-
-### Perform Filtered Scan (Targeted by BSSID/Channel)
-```bash
-./wstt_interface.py scan filter
-```
-- Parses latest full scan file
-- Lets you select an AP (BSSID and channel)
-- Prompts for duration
-- Saves results to `./scans/wstt_filter-scan-<timestamp>.csv`
+Files are auto-selected based on recency, or prompted when multiple exist.
 
 ---
 
 ## **Logging**
-All actions and errors are logged to `wstt.log` (path defined in `wstt_config.json`):
-```bash
-tail -f logs/wstt.log
-```
+All key events and actions are logged to `wstt.log` (optional).  
+Manual review of scan and capture artefacts is also supported via detection scripts.
 
 ---
 
 ## **Configuration**
-WSTT uses a JSON-based configuration file: `wstt_config.json`
-
-Example entries:
-```json
-"scan_directory": "./scans/",
-"capture_directory": "./caps/",
-"file_naming": {
-  "full_scan": "wstt_full-scan-{timestamp}.csv",
-  "filter_scan": "wstt_filter-scan-{timestamp}.csv",
-  "full_cap": "wstt_full-cap-{timestamp}.pcap",
-  "filter_cap": "wstt_filter-cap-{timestamp}.pcap"
-}
-```
+WSTT uses `config.sh` to set:
+- `INTERFACE` (e.g. wlan0mon)
+- `CAP_DIR`, `SCN_DIR` for output
+- Default durations and naming conventions
 
 ---
 

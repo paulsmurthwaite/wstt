@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.6.0] - 2025-04-02
+### Added
+- Threat detection scripts (Basic mode) for all **Implement** and **Optional** threats:
+  - `T001`: Unencrypted Traffic Capture
+  - `T002`: Probe Request Snooping
+  - `T003`: SSID Harvesting
+  - `T004`: Evil Twin Detection
+  - `T005`: Open Rogue AP
+  - `T006`: Misconfigured Access Point
+  - `T007`: Deauthentication Flood
+  - `T008`: Beacon Flood
+  - `T009`: Authentication Flood
+  - `T014`: ARP Spoofing
+  - `T015`: Malicious Hotspot Auto-Connect
+  - `T016`: Directed Probe Response
+- Interactive CLI for selecting detection mode and capture file
+- `.pcap` and `.csv` validation helpers
+- Integrated `validate_input.sh` for input checks
+- Default file selection logic based on latest timestamp or file count
+- Placeholder mode for future Advanced detection scripts
+
+### Changed
+- Unified detection script structure (Basic/Advanced selector)
+- Improved user feedback and input prompts
+- Output formatting standardised across all detection scripts
+
+---
+
 ## [0.5.0] - 2025-03-27
 ### Added
 - `capture_full` function:
