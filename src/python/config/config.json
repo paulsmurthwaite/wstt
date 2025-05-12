@@ -1,21 +1,7 @@
 {
-    "interface": "wlx00c0cab4b58c",
     "log_file": "./logs/wstt.log",
-    "scan_directory": "./scans/",
-    "capture_directory": "./caps/",
-    "file_naming": {
-        "full_scan": "wstt_full-scan-{timestamp}.csv",
-        "target_scan": "wstt_filter-scan-{timestamp}.csv",
-        "full_cap": "wstt_full-cap-{timestamp}.pcap",
-        "filter_cap": "wstt_filter-cap-{timestamp}.pcap"
-    },
-    "time_control": {
-        "options": [
-            "duration",
-            "packet_limit",
-            "manual_stop"
-        ]
-    },
+    "scan_directory": "../output/scans/",
+    "capture_directory": "../output/captures/",
     "colors": {
         "success": "\\033[92m",
         "info": "\\033[90m",
