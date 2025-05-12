@@ -1,15 +1,16 @@
 #!/bin/bash
 
-# Set parameters
-source ./config.sh
-source ./helpers/validate_input.sh
+# Environment
+source "$(dirname "${BASH_SOURCE[0]}")/load_env.sh"
+
+# Parameters
 OUTPUT_FILE="$SCN_DIR/wstt_scan-$FILE_BASE"
 
 # Header
 echo ""
 echo "[ Traffic Scan ]"
 
-# Select scan type
+# Scan type
 echo ""
 echo "[+] Type:"
 echo "    [1] Full"
@@ -49,7 +50,7 @@ if [ "$SCAN_TYPE" = "1" ]; then
     DURATION="${DURATION:-$DEFAULT_SCAN_DURATION}"
     validate_duration "$DURATION"
 
-    # Set output filename
+    # Output filename
     OUTPUT_FILE="$SCN_DIR/wstt_scan-full-${BAND_LABEL}-$FILE_BASE"
 
     # Run scan
@@ -74,7 +75,7 @@ if [ "$SCAN_TYPE" = "1" ]; then
 #  Filtered scan
 elif [ "$SCAN_TYPE" = "2" ]; then
 
-    # Input filter parameters
+    # Filter parameters
     echo ""
     echo "[ Filter Selection ]"
     echo ""
@@ -93,7 +94,7 @@ elif [ "$SCAN_TYPE" = "2" ]; then
     DURATION="${DURATION:-$DEFAULT_SCAN_DURATION}"
     validate_duration "$DURATION"
 
-    # Set output filename
+    # Output filename
     OUTPUT_FILE="$SCN_DIR/wstt_scan-filtered-$FILE_BASE"
 
     # Run scan

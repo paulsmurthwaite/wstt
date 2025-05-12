@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source ./config.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../config/config.sh"
 
 validate_bssid() {
     local bssid="$1"

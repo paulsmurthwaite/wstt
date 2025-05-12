@@ -1,12 +1,12 @@
 # Absolute Path
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"  # /src/bash
 
 # Project Root
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/../.." && pwd )"  # /WSTT-Project
 
 # Output Directories
-SCN_DIR="$PROJECT_ROOT/output/scans"
-CAP_DIR="$PROJECT_ROOT/output/captures"
+SCN_DIR="$PROJECT_ROOT/src/output/scans"
+CAP_DIR="$PROJECT_ROOT/src/output/captures"
 
 # File naming convention
 TIMESTAMP=$(date +"%Y%m%d%H%M%S")

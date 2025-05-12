@@ -1,17 +1,17 @@
 #!/bin/bash
 
-# T016 – Directed Probe Response Detection
-# Flags possible spoofed responses to client probe requests
+# T015 – Malicious Hotspot Auto-Connect Detection
+# Lists clients sending association requests to SSIDs
 
-# Usage: ./detect_t016.sh
+# Usage: ./detect_t014.sh
 # Requires: .pcap capture file, tshark
 
-source ./config.sh
-source ./helpers/validate_input.sh
+# Environment
+source "$(dirname "${BASH_SOURCE[0]}")/../load_env.sh"
 
 # Header
 echo ""
-echo "[ T016 – Directed Probe Response Detection ]"
+echo "[ T015 – Malicious Hotspot Auto-Connect Detection ]"
 
 # Select detection mode
 echo ""
@@ -36,26 +36,20 @@ if [ "$DETECT_MODE" = "1" ]; then
     echo "    → $(basename "$PCAP_FILE")"
     echo ""
 
-    echo "[RESULT] Probe responses observed (possible impersonation):"
+    echo "[RESULT] Client association attempts (Auto-connect candidates):"
     echo "--------------------------------------------------"
 
     # Run detection
     tshark -r "$PCAP_FILE" \
-        -Y "wlan.fc.type_subtype == 5" \
+        -Y "wlan.fc.type_subtype == 0" \
         -T fields -e wlan.sa -e wlan.ssid 2>/dev/null |
     awk '
     {
         mac = $1
         ssid = $2
-        if (ssid == "") ssid = "[Hidden or Empty]"
         if (mac != "") {
-            seen[mac "|" ssid]++
-        }
-    }
-    END {
-        for (entry in seen) {
-            split(entry, parts, "|")
-            printf "  BSSID: %-17s → SSID: %s\n", parts[1], parts[2]
+            if (ssid == "") ssid = "[Hidden or Unknown]"
+            printf "  Client: %-17s → SSID: %s\n", mac, ssid
         }
     }'
 
@@ -69,7 +63,7 @@ elif [ "$DETECT_MODE" = "2" ]; then
     echo "    → $(basename "$PCAP_FILE")"
     echo ""
 
-    # Run detection: python3 ./analysis/detect_t016.py "$PCAP_FILE"
+    # Run detection: python3 ./analysis/detect_t015.py "$PCAP_FILE"
     echo "[WARNING] Advanced detection not yet implemented."
     exit 1
 fi

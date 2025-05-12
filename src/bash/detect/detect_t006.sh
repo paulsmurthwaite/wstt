@@ -1,17 +1,17 @@
 #!/bin/bash
 
-# T005 – Open Rogue Access Point
-# Identifies APs with open (unencrypted) networks (Encryption == OPN)
+# T006 – Misconfigured Access Point Detection
+# Flags weak configurations: WEP, WPA-only (without WPA2/WPA3)
 
-# Usage: ./detect_t005.sh
+# Usage: ./detect_t006.sh
 # Requires: scan csv file
 
-source ./config.sh
-source ./helpers/validate_input.sh
+# Environment
+source "$(dirname "${BASH_SOURCE[0]}")/../load_env.sh"
 
 # Header
 echo ""
-echo "[ T005 – Open Rogue Access Point Detection ]"
+echo "[ T006 – Misconfigured Access Point Detection ]"
 
 # Select detection mode
 echo ""
@@ -31,15 +31,15 @@ validate_csv_file "$CSV_FILE" || exit 1
 
 # Basic detection
 if [ "$DETECT_MODE" = "1" ]; then
-    echo ""
+    printf "\n"
     echo "[INFO] Running basic detection on:"
     echo "    → $(basename "$CSV_FILE")"
     echo ""
 
-    echo "[RESULT] Detected Open (Unencrypted) Access Points:"
+    echo "[RESULT] Potentially Misconfigured Access Points:"
     echo "--------------------------------------------------"
 
-    # Parse and output result
+    # Check for WEP or WPA-only in Info field
     awk -F',' '
         BEGIN { section=1 }
         /^$/ { section++; next }
@@ -48,13 +48,18 @@ if [ "$DETECT_MODE" = "1" ]; then
             bssid=$1
             channel=$4
             encryption=$6
+            info=$NF
             gsub(/^ +| +$/, "", ssid)
             gsub(/^ +| +$/, "", bssid)
             gsub(/^ +| +$/, "", channel)
             gsub(/^ +| +$/, "", encryption)
+            gsub(/^ +| +$/, "", info)
 
-            if (encryption == "OPN") {
-                printf "  SSID: %-20s | BSSID: %-17s | Channel: %s\n", ssid, bssid, channel
+            if (encryption == "WEP") {
+                printf "  [WEP]  SSID: %-20s | BSSID: %-17s | Channel: %s\n", ssid, bssid, channel
+            }
+            else if (encryption == "WPA" && info !~ /WPA2|WPA3/) {
+                printf "  [WPA-Only]  SSID: %-16s | BSSID: %-17s | Channel: %s\n", ssid, bssid, channel
             }
         }
     ' "$CSV_FILE"
@@ -69,7 +74,7 @@ elif [ "$DETECT_MODE" = "2" ]; then
     echo "    → $(basename "$CSV_FILE")"
     echo ""
 
-    # Run detection: python3 ./analysis/detect_t005.py "$CSV_FILE"
+    # Run detection: python3 ./analysis/detect_t006.py "$CSV_FILE"
     echo "[WARNING] Advanced detection not yet implemented."
     exit 1
 fi

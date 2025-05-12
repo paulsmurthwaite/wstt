@@ -6,8 +6,8 @@
 # Usage: ./detect_t004.sh
 # Requires: scan csv file
 
-source ./config.sh
-source ./helpers/validate_input.sh
+# Environment
+source "$(dirname "${BASH_SOURCE[0]}")/../load_env.sh"
 
 # Header
 echo ""

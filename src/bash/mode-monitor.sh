@@ -1,6 +1,7 @@
 #!/bin/bash
 
-source ./config.sh
+# Environment
+source "$(dirname "${BASH_SOURCE[0]}")/load_env.sh"
 
 ./interface-down.sh
 echo "[INFO] Setting Monitor mode on interface $INTERFACE ..."

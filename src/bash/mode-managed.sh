@@ -1,6 +1,12 @@
 #!/bin/bash
 
-source ./config.sh
+# Environment
+source "$(dirname "${BASH_SOURCE[0]}")/load_env.sh"
+
+./interface-down.sh
+echo "[INFO] Setting Managed mode on interface $INTERFACE ..."
+sudo iw dev $INTERFACE set type managed
+./interface-up.sh
 
 # What mode is the interface in
 MODE=$(iw dev "$INTERFACE" info | awk '/type/ {print $2}')

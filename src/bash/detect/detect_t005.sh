@@ -1,17 +1,17 @@
 #!/bin/bash
 
-# T003 – SSID Harvesting Detection
-# Extracts unique SSIDs probed by client devices
+# T005 – Open Rogue Access Point
+# Identifies APs with open (unencrypted) networks (Encryption == OPN)
 
-# Usage: ./detect_t003.sh
+# Usage: ./detect_t005.sh
 # Requires: scan csv file
 
-source ./config.sh
-source ./helpers/validate_input.sh
+# Environment
+source "$(dirname "${BASH_SOURCE[0]}")/../load_env.sh"
 
 # Header
 echo ""
-echo "[ T003 – SSID Harvesting Detection ]"
+echo "[ T005 – Open Rogue Access Point Detection ]"
 
 # Select detection mode
 echo ""
@@ -31,33 +31,33 @@ validate_csv_file "$CSV_FILE" || exit 1
 
 # Basic detection
 if [ "$DETECT_MODE" = "1" ]; then
-    printf "\n"
+    echo ""
     echo "[INFO] Running basic detection on:"
     echo "    → $(basename "$CSV_FILE")"
     echo ""
 
-    echo "[RESULT] Probed SSIDs (Harvested from client requests):"
+    echo "[RESULT] Detected Open (Unencrypted) Access Points:"
     echo "--------------------------------------------------"
 
-    # Parse
+    # Parse and output result
     awk -F',' '
-        BEGIN { section=0 }
-        /^$/ { section++ }
-        section==2 && NF > 0 {
-            ssids=$NF
-            split(ssids, essid_list, /[;|]/)
-            for (i in essid_list) {
-                gsub(/^ +| +$/, "", essid_list[i])
-                if (essid_list[i] != "")
-                    seen[essid_list[i]]++
+        BEGIN { section=1 }
+        /^$/ { section++; next }
+        section==1 && NF > 14 {
+            ssid=$14
+            bssid=$1
+            channel=$4
+            encryption=$6
+            gsub(/^ +| +$/, "", ssid)
+            gsub(/^ +| +$/, "", bssid)
+            gsub(/^ +| +$/, "", channel)
+            gsub(/^ +| +$/, "", encryption)
+
+            if (encryption == "OPN") {
+                printf "  SSID: %-20s | BSSID: %-17s | Channel: %s\n", ssid, bssid, channel
             }
         }
-        END {
-            for (ssid in seen) {
-                print "  → " ssid
-            }
-        }
-    ' "$CSV_FILE" | sort
+    ' "$CSV_FILE"
 
     echo "--------------------------------------------------"
     echo ""
@@ -69,7 +69,7 @@ elif [ "$DETECT_MODE" = "2" ]; then
     echo "    → $(basename "$CSV_FILE")"
     echo ""
 
-    # Run detection: python3 ./analysis/detect_t003.py "$CSV_FILE"
+    # Run detection: python3 ./analysis/detect_t005.py "$CSV_FILE"
     echo "[WARNING] Advanced detection not yet implemented."
     exit 1
 fi

@@ -1,10 +1,10 @@
 #!/bin/bash
 
-source ./config.sh
+# Environment
+source "$(dirname "${BASH_SOURCE[0]}")/load_env.sh"
 
-echo "[INFO] Bringing interface $INTERFACE down..."
-sudo ip link set $INTERFACE down
-sleep 3
+echo "[INFO] Bringing interface $INTERFACE up..."
+sudo ip link set $INTERFACE up
 
 LINK_OUTPUT=$(ip link show "$INTERFACE")  # Inspect the interface status
 MODE_LINE=$(echo "$LINK_OUTPUT" | grep "UP")  # Extract the UP indicator

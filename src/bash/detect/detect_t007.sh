@@ -6,8 +6,8 @@
 # Usage: ./detect_t007.sh
 # Requires: .pcap capture file, tshark
 
-source ./config.sh
-source ./helpers/validate_input.sh
+# Environment
+source "$(dirname "${BASH_SOURCE[0]}")/../load_env.sh"
 
 # Header
 echo ""

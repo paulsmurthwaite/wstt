@@ -1,17 +1,17 @@
 #!/bin/bash
 
-# T015 – Malicious Hotspot Auto-Connect Detection
-# Lists clients sending association requests to SSIDs
+# T008 – Beacon Flood Detection
+# Counts excessive 802.11 beacon frames in a .pcap capture
 
-# Usage: ./detect_t014.sh
+# Usage: ./detect_t008.sh
 # Requires: .pcap capture file, tshark
 
-source ./config.sh
-source ./helpers/validate_input.sh
+# Environment
+source "$(dirname "${BASH_SOURCE[0]}")/../load_env.sh"
 
 # Header
 echo ""
-echo "[ T015 – Malicious Hotspot Auto-Connect Detection ]"
+echo "[ T008 – Beacon Flood Detection ]"
 
 # Select detection mode
 echo ""
@@ -36,24 +36,22 @@ if [ "$DETECT_MODE" = "1" ]; then
     echo "    → $(basename "$PCAP_FILE")"
     echo ""
 
-    echo "[RESULT] Client association attempts (Auto-connect candidates):"
-    echo "--------------------------------------------------"
-
     # Run detection
-    tshark -r "$PCAP_FILE" \
-        -Y "wlan.fc.type_subtype == 0" \
-        -T fields -e wlan.sa -e wlan.ssid 2>/dev/null |
-    awk '
-    {
-        mac = $1
-        ssid = $2
-        if (mac != "") {
-            if (ssid == "") ssid = "[Hidden or Unknown]"
-            printf "  Client: %-17s → SSID: %s\n", mac, ssid
-        }
-    }'
+    # Count number of beacon frames (type_subtype == 8)
+    BEACON_COUNT=$(tshark -r "$PCAP_FILE" -Y "wlan.fc.type_subtype == 8" 2>/dev/null | wc -l)
 
-    echo "--------------------------------------------------"
+    # Define a threshold for flagging
+    THRESHOLD=500
+
+    # Output result
+    if [ "$BEACON_COUNT" -gt "$THRESHOLD" ]; then
+        echo "[RESULT] FAIL – Beacon flood likely detected"
+        echo "         Count: $BEACON_COUNT beacon frames"
+    elif [ "$BEACON_COUNT" -gt 0 ]; then
+        echo "[RESULT] WARNING – Beacons observed (Count: $BEACON_COUNT)"
+    else
+        echo "[RESULT] PASS – No beacon frames found"
+    fi
     echo ""
 
 # Advanced detection
@@ -63,7 +61,7 @@ elif [ "$DETECT_MODE" = "2" ]; then
     echo "    → $(basename "$PCAP_FILE")"
     echo ""
 
-    # Run detection: python3 ./analysis/detect_t015.py "$PCAP_FILE"
+    # Run detection: python3 ./analysis/detect_t008.py "$PCAP_FILE"
     echo "[WARNING] Advanced detection not yet implemented."
     exit 1
 fi

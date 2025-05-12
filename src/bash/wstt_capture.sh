@@ -1,15 +1,16 @@
 #!/bin/bash
 
-# Set parameters
-source ./config.sh
-source ./helpers/validate_input.sh
+# Environment
+source "$(dirname "${BASH_SOURCE[0]}")/load_env.sh"
+
+# Parameters
 OUTPUT_FILE="$CAP_DIR/wstt_capture-$FILE_BASE.pcap"
 
 # Header
 echo ""
 echo "[ Packet Capture ]"
 
-# Select capture type
+# Capture type
 echo ""
 echo "[+] Type:"
 echo "    [1] Full"
@@ -71,7 +72,7 @@ if [ "$CAP_TYPE" = "1" ]; then
 #  Filtered capture
 elif [ "$CAP_TYPE" = "2" ]; then
 
-    # Input filter parameters
+    # Filter parameters
     echo ""
     echo "[ Filter Selection ]"
     echo ""
