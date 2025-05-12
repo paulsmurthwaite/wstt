@@ -13,7 +13,7 @@ import logging
 import json
 import os
 
-config_file = "wstt_config.json"
+config_file = "./config/config.json"
 log_flag_file = "/tmp/wstt_log_initialised"  # Persistent flag for session-based logging
 
 # Load Configuration

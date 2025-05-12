@@ -20,9 +20,9 @@ import threading
 import time
 from datetime import datetime
 from tabulate import tabulate
-from wstt_logging import log_message
+from logger import log_message
 
-config_file = "wstt_config.json"
+config_file = "./config/config.json"
 
 # Load Configuration
 def load_config():
