@@ -6,8 +6,8 @@
 # Usage: ./detect_t001.sh
 # Requires: tshark
 
-# Environment
-source "$(dirname "${BASH_SOURCE[0]}")/../load_env.sh"
+# Load environment
+source "$(dirname "${BASH_SOURCE[0]}")/../fn_load-env.sh"
 
 # Header
 echo ""

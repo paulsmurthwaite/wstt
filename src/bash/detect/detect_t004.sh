@@ -6,8 +6,8 @@
 # Usage: ./detect_t004.sh
 # Requires: scan csv file
 
-# Environment
-source "$(dirname "${BASH_SOURCE[0]}")/../load_env.sh"
+# Load environment
+source "$(dirname "${BASH_SOURCE[0]}")/../fn_load-env.sh"
 
 # Header
 echo ""

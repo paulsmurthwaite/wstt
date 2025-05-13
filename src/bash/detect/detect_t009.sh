@@ -6,8 +6,8 @@
 # Usage: ./detect_t009.sh
 # Requires: .pcap capture file, tshark
 
-# Environment
-source "$(dirname "${BASH_SOURCE[0]}")/../load_env.sh"
+# Load environment
+source "$(dirname "${BASH_SOURCE[0]}")/../fn_load-env.sh"
 
 # Header
 echo ""
