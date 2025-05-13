@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Environment
-source "$(dirname "${BASH_SOURCE[0]}")/load_env.sh"
+# Load environment
+source "$(dirname "${BASH_SOURCE[0]}")/fn_load-env.sh"
 
 # Parameters
 OUTPUT_FILE="$CAP_DIR/wstt_capture-$FILE_BASE.pcap"
