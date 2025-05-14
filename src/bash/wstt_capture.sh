@@ -6,13 +6,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/fn_load-env.sh"
 # Parameters
 OUTPUT_FILE="$CAP_DIR/wstt_capture-$FILE_BASE.pcap"
 
-# Header
-echo ""
-echo "[ Packet Capture ]"
-
 # Capture type
-echo ""
-echo "[+] Type:"
+echo "[+] Capture Type:"
 echo "    [1] Full"
 echo "    [2] Filtered"
 read -rp "    → " CAP_TYPE

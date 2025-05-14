@@ -6,13 +6,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/fn_load-env.sh"
 # Parameters
 OUTPUT_FILE="$SCN_DIR/wstt_scan-$FILE_BASE"
 
-# Header
-echo ""
-echo "[ Traffic Scan ]"
-
 # Scan type
-echo ""
-echo "[+] Type:"
+echo "[+] Scan Type:"
 echo "    [1] Full"
 echo "    [2] Filtered"
 read -rp "    → " SCAN_TYPE

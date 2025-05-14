@@ -91,7 +91,9 @@ def show_menu():
     print("[3] Reset Interface")
     print("[4] Scan Wireless Traffic")
     print("[5] Capture Wireless Packets")
-    print("[0] Exit")
+    print("[6] Wireless Threat Detection")
+
+    print("\n[0] Exit")
 
 def run_bash_script(script_name, pause=True, capture=True, title=None):
     """
@@ -99,6 +101,7 @@ def run_bash_script(script_name, pause=True, capture=True, title=None):
     
     Args:
         script_name (str): Script name without extension.
+        title (str): Optional header to display before execution
         pause (bool): Whether to wait for user input after execution.
     """
     clear_screen()
@@ -135,6 +138,34 @@ def run_bash_script(script_name, pause=True, capture=True, title=None):
     if pause:
         input("\n[Press Enter to return to menu]")
 
+def run_python_script(script_name, pause=True, title=None):
+    """
+    Executes a Bash script located under /src/python/detect/.
+
+    Args:
+        script_name (str): Name of the script without '.py'
+        title (str): Optional header to display before execution
+    """
+    clear_screen()
+    if title:
+        print_header(title)
+        print()
+
+    script_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "detect", f"{script_name}.py")
+    )
+
+    if not os.path.exists(script_path):
+        print(f"[!] Script not found: {script_name}.py")
+    else:
+        try:
+            subprocess.run(["python3", script_path], check=True)
+        except subprocess.CalledProcessError:
+            print(f"[!] Script failed during execution: {script_name}.py")
+
+    if pause:
+        input("\n[Press Enter to return to menu]")
+
 def interface_state():
     """Interface State submenu."""
 
@@ -158,7 +189,8 @@ def interface_state():
         print_interface_status()
         print("[1] Set current interface DOWN")
         print("[2] Bring current interface UP")
-        print("[0] Return to Main Menu")
+
+        print("\n[0] Return to Main Menu")
 
         choice = input("\n[+] Select an option: ")
 
@@ -195,7 +227,8 @@ def interface_mode():
         print_interface_status()
         print("[1] Switch to Managed mode")
         print("[2] Switch to Monitor mode")
-        print("[0] Return to Main Menu")
+
+        print("\n[0] Return to Main Menu")
 
         choice = input("\n[+] Select an option: ")
 
@@ -232,7 +265,8 @@ def interface_reset():
         print_interface_status()
         print("[1] Perform Soft Reset (Interface Down/Up)")
         print("[2] Perform Hard Reset (Interface Unload/Reload)")
-        print("[0] Return to Main Menu")
+
+        print("\n[0] Return to Main Menu")
 
         choice = input("\n[+] Select an option: ")
 
@@ -248,11 +282,101 @@ def interface_reset():
 
 def run_scan():
     """Scan traffic handler."""
-    run_bash_script("wstt_scan", pause=True)
+    run_bash_script("wstt_scan", pause=True, capture=False, title="Scan Wireless Traffic to file")
 
 def run_capture():
     """Capture packets handler."""
-    run_bash_script("wstt_capture", pause=True)
+    run_bash_script("wstt_capture", pause=True, capture=False, title="Capture Wireless Packets to file")
+
+def run_threat_detection():
+    """Wireless threat detection submenu."""
+
+    def detect_t001():
+        run_python_script("detect_t001", pause=True, title="T001 – Unencrypted Traffic Capture")
+
+    def detect_t002():
+        run_python_script("detect_t002", pause=True, title="T002 – Probe Request Snooping")
+
+    def detect_t003():
+        run_python_script("detect_t003", pause=True, title="T003 – SSID Harvesting")
+
+    def detect_t004():
+        run_python_script("detect_t004", pause=True, title="T004 – Evil Twin Attack")
+
+    def detect_t005():
+        run_python_script("detect_t005", pause=True, title="T005 – Open Rogue AP")
+
+    def detect_t006():
+        run_python_script("detect_t006", pause=True, title="T006 – Misconfigured Access Point")
+
+    def detect_t007():
+        run_python_script("detect_t007", pause=True, title="T007 – Deauthentication Flood")
+
+    def detect_t008():
+        run_python_script("detect_t008", pause=True, title="T008 – Beacon Flood")
+
+    def detect_t009():
+        run_python_script("detect_t009", pause=True, title="T009 – Authentication Flood")
+
+    def detect_t014():
+        run_python_script("detect_t014", pause=True, title="T014 – ARP Spoofing from Wireless Entry Point")
+
+    def detect_t015():
+        run_python_script("detect_t015", pause=True, title="T015 – Malicious Hotspot Auto-Connect")
+
+    def detect_t016():
+        run_python_script("detect_t016", pause=True, title="T016 – Directed Probe Response")
+
+    actions = {
+        "1":  detect_t001,
+        "2":  detect_t002,
+        "3":  detect_t003,
+        "4":  detect_t004,
+        "5":  detect_t005,
+        "6":  detect_t006,
+        "7":  detect_t008,
+        "8":  detect_t007,
+        "9":  detect_t009,
+        "10": detect_t014,
+        "11": detect_t015,
+        "12": detect_t016
+    }
+
+    while True:
+        clear_screen()
+        print_header("Wireless Threat Detection")
+        print()
+
+        print_header("Access Point Threats")
+        print("[1]  T001 – Unencrypted Traffic Capture")
+        print("[2]  T002 – Probe Request Snooping")
+        print("[3]  T003 – SSID Harvesting")
+        print("[4]  T004 – Evil Twin Attack")
+        print("[5]  T005 – Open Rogue AP")
+        print("[6]  T006 – Misconfigured Access Point")
+        print("[7]  T008 – Beacon Flood")
+        print()
+
+        print_header("Client Exploits")
+        print("[8]  T007 – Deauthentication Flood")
+        print("[9]  T009 – Authentication Flood")
+        print("[10] T014 – ARP Spoofing from Wireless Entry Point")
+        print("[11] T015 – Malicious Hotspot Auto-Connect")
+        print("[12] T016 – Directed Probe Response")
+
+        print("\n[0] Return to Main Menu")
+
+        choice = input("\n[+] Select a threat scenario to run: ")
+
+        if choice == "0":
+            break
+
+        action = actions.get(choice)
+        if action:
+            clear_screen()
+            action()
+        else:
+            pause_on_invalid()
 
 def main():
     """User input handler."""
@@ -271,6 +395,8 @@ def main():
             run_scan()
         elif choice == "5":
             run_capture()
+        elif choice == "6":
+            run_threat_detection()
         elif choice == "0":
             print("\nExiting to shell.")
             break
