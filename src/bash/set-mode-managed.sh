@@ -3,15 +3,8 @@
 # Load environment
 source "$(dirname "${BASH_SOURCE[0]}")/fn_load-env.sh"
 
-# Set interface down
-./set-interface-down.sh
-
 # Change mode
+bash "$SCRIPT_DIR/set-interface-down.sh"  # Interface down
 echo "[INFO] Setting Managed mode on interface $INTERFACE ..."
 sudo iw dev $INTERFACE set type managed
-
-# Bring interface up
-./set-interface-up.sh
-
-# Read interface mode
-./get-interface-mode.sh
+bash "$SCRIPT_DIR/set-interface-up.sh"  # Interface up

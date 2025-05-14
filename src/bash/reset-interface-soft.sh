@@ -3,9 +3,8 @@
 # Load environment
 source "$(dirname "${BASH_SOURCE[0]}")/fn_load-env.sh"
 
-# Interface soft reset
-./set-interface-down.sh
-./set-interface-up.sh
+# Set interface down
+bash "$SCRIPT_DIR/set-interface-down.sh"
 
-# Check interface state
-./get-current-interface.sh
+# Bring interface up
+bash "$SCRIPT_DIR/set-interface-up.sh"

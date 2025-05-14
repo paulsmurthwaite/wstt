@@ -14,6 +14,3 @@ sudo rmmod $DRIVER
 echo "[INFO] Reloading interface $INTERFACE ..."
 sudo modprobe $DRIVER
 sleep 5
-
-# Check interface state
-./get-current-interface.sh

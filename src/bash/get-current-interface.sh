@@ -3,16 +3,26 @@
 # Load environment
 source "$(dirname "${BASH_SOURCE[0]}")/fn_load-env.sh"
 
-# Show current interface
-ip link show $INTERFACE
+# Read interface state
+LINK_OUTPUT=$(ip link show "$INTERFACE")
+STATE=$(echo "$LINK_OUTPUT" | grep "UP")  # Extract UP indicator
 
-# Check interface state
-LINK_OUTPUT=$(ip link show "$INTERFACE")  # Inspect the interface status
-MODE_LINE=$(echo "$LINK_OUTPUT" | grep "UP")  # Extract the UP indicator
+# Read interface mode
+MODE=$(iw dev "$INTERFACE" info | awk '/type/ {print $2}')
+
+# Display interface
+echo "Interface: $INTERFACE"
 
 # Display interface state
-if [ -n "$MODE_LINE" ]; then
-    echo "[INFO] Interface $INTERFACE is UP."
+if [ -n "$STATE" ]; then
+    echo "State: UP"
 else
-    echo "[INFO] Interface $INTERFACE is DOWN."
+    echo "State: DOWN"
+fi
+
+# Display interface mode
+if [ -n "$MODE" ]; then
+    echo "Mode: $MODE"
+else
+    echo "[WARN] Could not determine mode for interface $INTERFACE."
 fi

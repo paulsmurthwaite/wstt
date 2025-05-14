@@ -7,8 +7,10 @@ source "$(dirname "${BASH_SOURCE[0]}")/fn_load-env.sh"
 MODE=$(iw dev "$INTERFACE" info | awk '/type/ {print $2}')
 
 # Display interface mode
+echo ""
+echo "Interface: $INTERFACE"
 if [ -n "$MODE" ]; then
-    echo "[INFO] Interface $INTERFACE is in '$MODE' mode."
+    echo "Interface mode: $MODE"
 else
     echo "[WARN] Could not determine mode for interface $INTERFACE."
 fi
