@@ -3,13 +3,9 @@
 
 Main entry point for the Wireless Security Testing Toolkit (WSTT) menu interface.
 
-This script provides a simple, operator-friendly CLI for accessing key toolkit
-functions such as scanning, capturing, and detection.  It is designed to offer a 
-clear and low-complexity user experience, suitable for field use in SME environments.
+This script provides a simple, operator-friendly CLI for accessing key toolkit functions such as scanning, capturing, and detection.  It is designed to offer a clear and low-complexity user experience, suitable for field use in SME environments.
 
-The menu system acts as the central launcher for Bash and Python-based components 
-of the toolkit, with screen clearing and section redrawing used to improve usability 
-without introducing graphical complexity.
+The menu system acts as the central launcher for Bash and Python-based components of the toolkit, with screen clearing and section redrawing used to improve usability without introducing graphical complexity.
 
 Author:      Paul Smurthwaite
 Date:        2025-05-14
@@ -140,7 +136,7 @@ def run_bash_script(script_name, pause=True, capture=True, title=None):
 
 def run_python_script(script_name, pause=True, title=None):
     """
-    Executes a Bash script located under /src/python/detect/.
+    Executes a Python script located under /src/python/detect/.
 
     Args:
         script_name (str): Name of the script without '.py'
@@ -334,8 +330,8 @@ def run_threat_detection():
         "4":  detect_t004,
         "5":  detect_t005,
         "6":  detect_t006,
-        "7":  detect_t008,
-        "8":  detect_t007,
+        "7":  detect_t007,
+        "8":  detect_t008,
         "9":  detect_t009,
         "10": detect_t014,
         "11": detect_t015,
