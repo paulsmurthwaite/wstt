@@ -109,10 +109,7 @@ elif [ "$CAP_TYPE" = "2" ]; then
         echo ""
         echo "[INFO] Filtered capture for $DURATION seconds..."
         echo ""
-        sudo timeout "$DURATION" \
-            tcpdump -i "$INTERFACE" \
-            -w "$OUTPUT_FILE" \
-            wlan host "$BSSID"
+        sudo timeout "$DURATION" tcpdump -i "$INTERFACE" -w "$OUTPUT_FILE"
         OUTPUT_PARAMS="BSSID=$BSSID | Channel=$CURRENT_CHANNEL | Duration=$DURATION seconds"
 
     elif [ "$CAP_MODE" = "2" ]; then
@@ -128,10 +125,7 @@ elif [ "$CAP_TYPE" = "2" ]; then
         echo ""
         echo "[INFO] Filtered capture of $MAX_PACKETS packets..."
         echo ""
-        sudo tcpdump -i "$INTERFACE" \
-            -c "$MAX_PACKETS" \
-            -w "$OUTPUT_FILE" \
-            wlan host "$BSSID"
+        sudo tcpdump -i "$INTERFACE" -c "$MAX_PACKETS" -w "$OUTPUT_FILE"
         OUTPUT_PARAMS="BSSID=$BSSID | Channel=$CURRENT_CHANNEL | Packets=$MAX_PACKETS"
 
     else
