@@ -13,7 +13,7 @@ __pycache__/
 *.pcap
 
 # Ignore local backups & other files
-*wstt_backup.*
+backup_wstt.sh
 *.txt
 
 # Ignore legacy files
