@@ -1,118 +1,169 @@
 #!/bin/bash
 
-# Load environment
-source "$(dirname "${BASH_SOURCE[0]}")/fn_load-env.sh"
+# Load helpers
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/fn_load-env.sh"
 
 # Parameters
 OUTPUT_FILE="$SCN_DIR/wstt_scan-$FILE_BASE"
 
-# Scan type
-echo "[+] Scan Type:"
-echo "    [1] Full"
-echo "    [2] Filtered"
-read -rp "    → " SCAN_TYPE
+# Input scan type
+while true; do
+    print_prompt "Scan Type: [1] Full [2] Filtered: "
+    read -r SCAN_TYPE
+
+    if [[ "$SCAN_TYPE" == "1" || "$SCAN_TYPE" == "2" ]]; then
+        break
+    else
+        print_fail "Invalid selection. Please enter 1 or 2"
+    fi
+done
 
 # Full scan
 if [ "$SCAN_TYPE" = "1" ]; then
     
     # Input band
-    echo ""
-    echo "[ Band Selection ]"
-    echo ""
-    echo "[+] Band:"
-    echo "    [1] 2.4GHz"
-    echo "    [2] 5GHz"
-    read -rp "    → " BAND_SELECT
+    while true; do
+        print_prompt "Band: [1] 2.4GHz [2] 5GHz: "
+        read -r BAND_SELECT
 
-    # Selection handler
-    if [ "$BAND_SELECT" = "1" ]; then
-        CHANNELS="$CHANNELS_24GHZ_UK"
-        BAND_LABEL="2.4ghz"
-    elif [ "$BAND_SELECT" = "2" ]; then
-        CHANNELS="$CHANNELS_5GHZ_UK"
-        BAND_LABEL="5ghz"
-    else
-        echo "[ERROR] Invalid selection. Please select 1 or 2."
-        exit 1
-    fi
+        if [[ "$BAND_SELECT" == "1" ]]; then
+            CHANNELS="$CHANNELS_24GHZ_UK"
+            BAND_LABEL="2.4ghz"
+            break
+        elif [[ "$BAND_SELECT" == "2" ]]; then
+            CHANNELS="$CHANNELS_5GHZ_UK"
+            BAND_LABEL="5ghz"
+            break
+        else
+            print_fail "Invalid selection. Please enter 1 or 2"
+        fi
+    done
 
     # Input duration
-    echo ""
-    echo "[ Full Scan ($BAND_LABEL) ]"
-    echo ""
-    echo "[+] Duration (seconds) [default]: ${DEFAULT_SCAN_DURATION}]: "
-    read -rp "    → " DURATION
-    DURATION="${DURATION:-$DEFAULT_SCAN_DURATION}"
-    validate_duration "$DURATION"
+    while true; do
+        print_prompt "Duration (seconds) [default]: ${DEFAULT_SCAN_DURATION}]: "
+        read -r DURATION
+
+        DURATION="${DURATION:-$DEFAULT_SCAN_DURATION}"
+        
+        if [[ "$DURATION" =~ ^[0-9]+$ ]]; then
+            break
+        else
+            print_fail "Invalid input. Enter a numeric value (seconds)"
+        fi
+    done
 
     # Output filename
     OUTPUT_FILE="$SCN_DIR/wstt_scan-full-${BAND_LABEL}-$FILE_BASE"
 
+    # Check mode
+    MODE=$(iw dev "$INTERFACE" info | awk '/type/ {print $2}')
+    if [[ "$MODE" != "monitor" ]]; then
+        print_blank
+        print_action "Setting Monitor mode"
+        bash "$SCRIPT_DIR/set-mode-monitor.sh"
+        print_success "Interface set to Monitor mode"
+        sleep 3
+    fi
+
     # Run scan
-    sudo timeout "$DURATION" \
-        airodump-ng "$INTERFACE" \
-        --channel "$CHANNELS" \
-        --write "$OUTPUT_FILE" \
-        --output-format csv
+    sudo timeout "$DURATION" airodump-ng "$INTERFACE" --channel "$CHANNELS" --write "$OUTPUT_FILE" --output-format csv
 
     # Rename file
     mv "${OUTPUT_FILE}-01.csv" "${OUTPUT_FILE}.csv"
 
+    # Reset mode to Managed
+    print_blank
+    print_action "Setting Managed mode"
+    bash "$SCRIPT_DIR/set-mode-managed.sh"
+    print_success "Interface set to Managed mode"
+
     # File output
     if [ -f "${OUTPUT_FILE}.csv" ]; then
-        printf "\n[INFO] Scan complete.\n"
-        echo "[INFO] Applied Parameters: Band=$BAND_LABEL | Channels=$CHANNELS | Duration=$DURATION seconds"
-        echo "[INFO] Output saved to: $OUTPUT_FILE"
+        print_blank
+        print_success "Scan complete"
+        print_info "Scan parameters : Band=$BAND_LABEL | Channels=$CHANNELS | Duration=$DURATION seconds"
+        print_info "Output file     : $OUTPUT_FILE"
     else
-        echo "[ERROR] Output file not found. Airodump-ng may have failed."
+        print_fail "Output file not found. Airodump-ng may have failed"
     fi
 
 #  Filtered scan
 elif [ "$SCAN_TYPE" = "2" ]; then
 
-    # Filter parameters
-    echo ""
-    echo "[ Filter Selection ]"
-    echo ""
-    echo "[+] BSSID: "
-    read -rp "    → " BSSID
-    validate_bssid "$BSSID"
+    # Input BSSID
+    while true; do
+        print_prompt "BSSID (target AP): "
+        read -r BSSID
 
-    echo ""
-    echo "[+] Channel: "
-    read -rp "    → " CHANNEL
-    validate_channel "$CHANNEL"
+        if [[ "$BSSID" =~ ^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$ ]]; then
+            break
+        else
+            print_fail "Invalid BSSID format. Expected XX:XX:XX:XX:XX:XX"
+        fi
+    done
 
-    echo ""
-    echo "[+] Duration (seconds) [default]: ${DEFAULT_SCAN_DURATION}]: "
-    read -rp "    → " DURATION
-    DURATION="${DURATION:-$DEFAULT_SCAN_DURATION}"
-    validate_duration "$DURATION"
+    VALID_CHANNELS="${CHANNELS_24GHZ_UK//,/ } ${CHANNELS_5GHZ_UK//,/ }"
+
+    while true; do
+        print_prompt "Channel: "
+        read -r CHANNEL
+
+        if [[ "$CHANNEL" =~ ^[0-9]+$ ]] && [[ $VALID_CHANNELS =~ (^|[[:space:]])$CHANNEL($|[[:space:]]) ]]; then
+            break
+        else
+            print_fail "Invalid channel. Must be numeric and UK legal (2.4GHz or 5GHz)"
+        fi
+    done
+
+    while true; do
+        print_prompt "Duration (seconds) [default: ${DEFAULT_SCAN_DURATION}]: "
+        read -r DURATION
+        DURATION="${DURATION:-$DEFAULT_SCAN_DURATION}"
+
+        if [[ "$DURATION" =~ ^[0-9]+$ ]]; then
+            break
+        else
+            print_fail "Invalid input. Enter a numeric value (seconds)"
+        fi
+    done
 
     # Output filename
     OUTPUT_FILE="$SCN_DIR/wstt_scan-filtered-$FILE_BASE"
 
+    # Check mode
+    MODE=$(iw dev "$INTERFACE" info | awk '/type/ {print $2}')
+    if [[ "$MODE" != "monitor" ]]; then
+        print_blank
+        print_action "Setting Monitor mode"
+        bash "$SCRIPT_DIR/set-mode-monitor.sh"
+        print_success "Interface set to Monitor mode"
+        sleep 3
+    fi
+
     # Run scan
-    sudo timeout "$DURATION" \
-        airodump-ng "$INTERFACE" \
-        --bssid "$BSSID" \
-        --channel "$CHANNEL" \
-        --write "$OUTPUT_FILE" \
-        --output-format csv
+    sudo timeout "$DURATION" airodump-ng "$INTERFACE" --bssid "$BSSID" --channel "$CHANNEL" --write "$OUTPUT_FILE" --output-format csv
 
     # Rename file
     mv "${OUTPUT_FILE}-01.csv" "${OUTPUT_FILE}.csv"
 
+    # Reset mode to Managed
+    print_blank
+    print_action "Setting Managed mode"
+    bash "$SCRIPT_DIR/set-mode-managed.sh"
+    print_success "Interface set to Managed mode"
+
     # File output
     if [ -f "${OUTPUT_FILE}.csv" ]; then
-        printf "\n[INFO] Scan complete.\n"
-        echo "[INFO] Applied Filter: BSSID=$BSSID | Channel=$CHANNEL | Duration=$DURATION seconds"
-        echo "[INFO] Output saved to: $OUTPUT_FILE"
+        print_blank
+        print_info "Scan complete"
+        print_info "Applied Filter: BSSID=$BSSID | Channel=$CHANNEL | Duration=$DURATION seconds"
+        print_info "Output saved to: $OUTPUT_FILE"
     else
-        echo "[ERROR] Output file not found. Airodump-ng may have failed."
+        print_fail "Output file not found. Airodump-ng may have failed"
     fi
 
 else
-    echo "[ERROR] Invalid Scan type. Please enter 1 or 2."
-    exit 1
+    print_fail "Invalid Scan type. Please enter 1 or 2"
 fi

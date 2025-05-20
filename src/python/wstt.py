@@ -12,11 +12,126 @@ Date:        2025-05-14
 Module:      TM470-25B
 """
 
-
-import pyfiglet
 import os
+import pyfiglet
 import subprocess
 
+# ─── UI Helpers ───
+# UI Colour Dictionary
+COLOURS = {
+    "reset":  "\033[0m",
+    "bold":   "\033[1m",
+    "grey":   "\033[90m",
+    "red":    "\033[91m",
+    "green":  "\033[92m",
+    "yellow": "\033[93m",
+    "magenta": "\033[95m",
+    "blue":    "\033[38;5;117m",
+    "warn":   "\033[38;5;226m",  # amber
+}
+
+# UI Colour
+def colour(text, style):
+    """
+    Apply ANSI colour styling to text.
+    """
+    return f"{COLOURS.get(style, '')}{text}{COLOURS['reset']}"
+
+# UI Banner
+def ui_banner():
+    """
+    Display ASCII banner.
+    """
+    ascii_banner = pyfiglet.figlet_format("WSTT", font="ansi_shadow")
+    print(colour(ascii_banner, "blue"))
+
+# UI Header
+def ui_header(title="Wireless Security Testing Toolkit"):
+    """
+    Display section header.
+    """
+    styled = f"{COLOURS['bold']}{COLOURS['blue']}[ {title} ]{COLOURS['reset']}"
+    print(styled)
+
+# UI Divider
+def ui_divider():
+    """
+    Display divider.
+    """
+    print(colour("-----------------------------------", "grey"))
+    print()
+
+# UI Subtitle
+def ui_subtitle():
+    """
+    Display combined subtitle.
+    """
+    ui_divider()
+    print_interface_status()
+    ui_divider()
+
+# UI Standard Header
+def ui_standard_header(menu_title=None):
+    """
+    Render standard UI header block: banner, main title, subtitle.
+    Optionally takes a menu title to display immediately after.
+    """
+    ui_banner()       # ASCII banner
+    ui_header()       # Toolkit title
+    print()
+    ui_subtitle()     # Divider + interface + service info
+
+    if menu_title:
+        ui_header(menu_title)  # Current menu title
+        print()
+
+# UI Clear Screen
+def ui_clear_screen():
+    """
+    Clear terminal screen.
+    """
+    os.system("cls" if os.name == "nt" else "clear")
+
+# UI Invalid Option
+def ui_pause_on_invalid():
+    """
+    Display invalid input message and pause.
+    """
+    print(colour("\n[!] Invalid option. Please try again.", "red"))
+    input("[Press Enter to continue]")
+
+# ─── Display Interface ───
+# 
+def print_interface_status():
+    """
+    Print the current interface, state, and mode.
+    """
+    interface, state_raw, mode_raw = get_interface_details()
+
+    state = state_raw.title()
+    mode = "AP" if mode_raw.lower() == "ap" else mode_raw.title()
+
+    # Determine colours
+    interface_display = colour(interface, "warn")
+    state_display = colour(state, "green" if state.lower() == "up" else "red")
+
+    if mode_raw.lower() == "managed":
+        mode_display = colour(mode, "green")
+    elif mode_raw.lower() == "monitor":
+        mode_display = colour(mode, "red")
+    elif mode_raw.lower() == "ap":
+        mode_display = colour(mode, "yellow")
+    else:
+        mode_display = colour(mode, "reset")
+
+    # Output
+    print(f"[ Interface       ] {interface_display}")
+    print(f"[ Interface State ] {state_display}")
+    print(f"[ Interface Mode  ] {mode_display}")
+    print()
+
+# ─── Interface Helpers ───
+#
 def get_interface_details():
     """
     Returns (interface, state, mode) from get-current-interface.sh.
@@ -47,51 +162,35 @@ def get_interface_state():
 def get_interface_mode():
     return f"Mode:      {get_interface_details()[2]}"
 
-def pause_on_invalid():
-    """Display invalid input message and pause."""
-    print("\n[!] Invalid option. Please try again.")
-    input("[Press Enter to continue]")
-
-def clear_screen():
-    """Clear terminal screen."""
-    os.system("cls" if os.name == "nt" else "clear")
-
-def print_header(title="Wireless Security Testing Toolkit"):
-    """Print section header."""
-    print(f"\033[94m[ {title} ]\033[0m")
-
-def print_interface_status():
-    """Print the current interface, state, and mode."""
-    interface, state, mode = get_interface_details()
-    print(f"Interface: {interface}")
-    print(f"State:     {state}")
-    print(f"Mode:      {mode}")
-    print()
-
+# ─── Display Main Menu ───
+# 
 def show_menu():
-    """Display main menu."""
-    clear_screen()
-    
-    # Generate ASCII banner
-    ascii_banner = pyfiglet.figlet_format("WSTT", font="ansi_shadow")
-    print("\033[94m" + ascii_banner + "\033[0m")
-    print_header()
+    """
+    Display main menu.
+    """
+    ui_clear_screen()
+
+    # Header block
+    ui_standard_header("Main Menu")
+
+    # Menu block
+    ui_header("Traffic Acquisition")
+    print("[1] Scan Wireless Traffic")
+    print("[2] Capture Wireless Frames")
     print()
+    ui_header("Traffic Analysis")
+    print("[3] Threat Detection")
+    print()
+    ui_header("Utilities")
+    print("[4] Service Control")
+    print("[5] Help | About")
 
-    # Display interface details
-    print_interface_status()
-
-    # Generate menu
-    print("[1] Change Interface State")
-    print("[2] Change Interface Mode")
-    print("[3] Reset Interface")
-    print("[4] Scan Wireless Traffic")
-    print("[5] Capture Wireless Packets")
-    print("[6] Wireless Threat Detection")
-
+    # Exit option
     print("\n[0] Exit")
 
-def run_bash_script(script_name, pause=True, capture=True, title=None):
+# ─── Bash Script Handler ───
+#
+def run_bash_script(script_name, pause=True, capture=True, clear=True, title=None):
     """
     Executes a Bash script located under /src/bash.
     
@@ -100,10 +199,11 @@ def run_bash_script(script_name, pause=True, capture=True, title=None):
         title (str): Optional header to display before execution
         pause (bool): Whether to wait for user input after execution.
     """
-    clear_screen()
+    if clear:
+        ui_clear_screen()
 
     if title:
-        print_header(title)
+        ui_header(title)
         print()
 
     # Bash script path
@@ -134,7 +234,9 @@ def run_bash_script(script_name, pause=True, capture=True, title=None):
     if pause:
         input("\n[Press Enter to return to menu]")
 
-def run_python_script(script_name, pause=True, title=None):
+# ─── Python Script Handler ───
+#
+def run_python_script(script_name, pause=True, capture=True, clear=True, title=None):
     """
     Executes a Python script located under /src/python/detect/.
 
@@ -142,9 +244,11 @@ def run_python_script(script_name, pause=True, title=None):
         script_name (str): Name of the script without '.py'
         title (str): Optional header to display before execution
     """
-    clear_screen()
+    if clear:
+        ui_clear_screen()
+
     if title:
-        print_header(title)
+        ui_header(title)
         print()
 
     script_path = os.path.abspath(
@@ -157,171 +261,64 @@ def run_python_script(script_name, pause=True, title=None):
         try:
             subprocess.run(["python3", script_path], check=True)
         except subprocess.CalledProcessError:
-            print(f"[!] Script failed during execution: {script_name}.py")
+            print(f"[x] Script failed during execution: {script_name}.py")
 
     if pause:
         input("\n[Press Enter to return to menu]")
 
-def interface_state():
-    """Interface State submenu."""
-
-    def set_interface_down():
-        run_bash_script("set-interface-down", pause=False, capture=False, title="Change Interface State")
-
-    def set_interface_up():
-        run_bash_script("set-interface-up", pause=False, capture=False, title="Change Interface State")
-
-    actions = {
-        "1": set_interface_down,
-        "2": set_interface_up
-    }
-
-    while True:
-        clear_screen()
-        print_header()
-        print()
-        print_header("Change Interface State")
-        print()
-        print_interface_status()
-        print("[1] Set current interface DOWN")
-        print("[2] Bring current interface UP")
-
-        print("\n[0] Return to Main Menu")
-
-        choice = input("\n[+] Select an option: ")
-
-        if choice == "0":
-            break
-
-        action = actions.get(choice)
-        if action:
-            clear_screen()
-            action()
-        else:
-            pause_on_invalid()
-
-def interface_mode():
-    """Interface mode submenu."""
-
-    def switch_to_managed():
-        run_bash_script("set-mode-managed", pause=False, capture=False, title="Change Interface Mode")
-
-    def switch_to_monitor():
-        run_bash_script("set-mode-monitor", pause=False, capture=False, title="Change Interface Mode")
-
-    actions = {
-        "1": switch_to_managed,
-        "2": switch_to_monitor
-    }
-
-    while True:
-        clear_screen()
-        print_header()
-        print()
-        print_header("Change Interface Mode")
-        print()
-        print_interface_status()
-        print("[1] Switch to Managed mode")
-        print("[2] Switch to Monitor mode")
-
-        print("\n[0] Return to Main Menu")
-
-        choice = input("\n[+] Select an option: ")
-
-        if choice == "0":
-            break
-
-        action = actions.get(choice)
-        if action:
-            clear_screen()
-            action()
-        else:
-            pause_on_invalid()
-
-def interface_reset():
-    """Reset interface submenu."""
-
-    def perform_soft_reset():
-        run_bash_script("reset-interface-soft", pause=False, capture=False, title="Reset Interface (Soft)")
-
-    def perform_hard_reset():
-        run_bash_script("reset-interface-hard", pause=False, capture=False, title="Reset Interface (Hard)")
-
-    actions = {
-        "1": perform_soft_reset,
-        "2": perform_hard_reset
-    }
-
-    while True:
-        clear_screen()
-        print_header()
-        print()
-        print_header("Reset Interface")
-        print()
-        print_interface_status()
-        print("[1] Perform Soft Reset (Interface Down/Up)")
-        print("[2] Perform Hard Reset (Interface Unload/Reload)")
-
-        print("\n[0] Return to Main Menu")
-
-        choice = input("\n[+] Select an option: ")
-
-        if choice == "0":
-            break
-
-        action = actions.get(choice)
-        if action:
-            clear_screen()
-            action()
-        else:
-            pause_on_invalid()
-
 def run_scan():
-    """Scan traffic handler."""
-    run_bash_script("wstt_scan", pause=True, capture=False, title="Scan Wireless Traffic to file")
+    """
+    Scan traffic handler.
+    """
+    print()
+    run_bash_script("wstt_scan", pause=True, capture=False, clear=False, title="Scan Wireless Traffic to file")
 
 def run_capture():
-    """Capture packets handler."""
-    run_bash_script("wstt_capture", pause=True, capture=False, title="Capture Wireless Packets to file")
+    """
+    Capture packets handler.
+    """
+    print()
+    run_bash_script("wstt_capture", pause=True, capture=False, clear=False, title="Capture Wireless Packets to file")
 
 def run_threat_detection():
-    """Wireless threat detection submenu."""
-
+    """
+    Wireless threat detection submenu.
+    """
     def detect_t001():
-        run_python_script("detect_t001", pause=True, title="T001 – Unencrypted Traffic Capture")
+        run_python_script("detect_t001", pause=True, clear=False, title="T001 – Unencrypted Traffic Capture")
 
     def detect_t002():
-        run_python_script("detect_t002", pause=True, title="T002 – Probe Request Snooping")
+        run_python_script("detect_t002", pause=True, clear=False, title="T002 – Probe Request Snooping")
 
     def detect_t003():
-        run_python_script("detect_t003", pause=True, title="T003 – SSID Harvesting")
+        run_python_script("detect_t003", pause=True, clear=False, title="T003 – SSID Harvesting")
 
     def detect_t004():
-        run_python_script("detect_t004", pause=True, title="T004 – Evil Twin Attack")
+        run_python_script("detect_t004", pause=True, clear=False, title="T004 – Evil Twin Attack")
 
     def detect_t005():
-        run_python_script("detect_t005", pause=True, title="T005 – Open Rogue AP")
+        run_python_script("detect_t005", pause=True, clear=False, title="T005 – Open Rogue AP")
 
     def detect_t006():
-        run_python_script("detect_t006", pause=True, title="T006 – Misconfigured Access Point")
+        run_python_script("detect_t006", pause=True, clear=False, title="T006 – Misconfigured Access Point")
 
     def detect_t007():
-        run_python_script("detect_t007", pause=True, title="T007 – Deauthentication Flood")
+        run_python_script("detect_t007", pause=True, clear=False, title="T007 – Deauthentication Flood")
 
     def detect_t008():
-        run_python_script("detect_t008", pause=True, title="T008 – Beacon Flood")
+        run_python_script("detect_t008", pause=True, clear=False, title="T008 – Beacon Flood")
 
     def detect_t009():
-        run_python_script("detect_t009", pause=True, title="T009 – Authentication Flood")
+        run_python_script("detect_t009", pause=True, clear=False, title="T009 – Authentication Flood")
 
     def detect_t014():
-        run_python_script("detect_t014", pause=True, title="T014 – ARP Spoofing from Wireless Entry Point")
+        run_python_script("detect_t014", pause=True, clear=False, title="T014 – ARP Spoofing from Wireless Entry Point")
 
     def detect_t015():
-        run_python_script("detect_t015", pause=True, title="T015 – Malicious Hotspot Auto-Connect")
+        run_python_script("detect_t015", pause=True, clear=False, title="T015 – Malicious Hotspot Auto-Connect")
 
     def detect_t016():
-        run_python_script("detect_t016", pause=True, title="T016 – Directed Probe Response")
+        run_python_script("detect_t016", pause=True, clear=False, title="T016 – Directed Probe Response")
 
     actions = {
         "1":  detect_t001,
@@ -339,11 +336,12 @@ def run_threat_detection():
     }
 
     while True:
-        clear_screen()
-        print_header("Wireless Threat Detection")
-        print()
+        ui_clear_screen()
 
-        print_header("Access Point Threats")
+        # Header block
+        ui_standard_header("Wireless Threat Detection")
+
+        ui_header("Access Point Threats")
         print("[1]  T001 – Unencrypted Traffic Capture")
         print("[2]  T002 – Probe Request Snooping")
         print("[3]  T003 – SSID Harvesting")
@@ -353,7 +351,7 @@ def run_threat_detection():
         print("[7]  T008 – Beacon Flood")
         print()
 
-        print_header("Client Exploits")
+        ui_header("Client Exploits")
         print("[8]  T007 – Deauthentication Flood")
         print("[9]  T009 – Authentication Flood")
         print("[10] T014 – ARP Spoofing from Wireless Entry Point")
@@ -369,35 +367,214 @@ def run_threat_detection():
 
         action = actions.get(choice)
         if action:
-            clear_screen()
+            print()
             action()
         else:
-            pause_on_invalid()
+            ui_pause_on_invalid()
+
+def service_control():
+    """
+    Service Control submenu.
+    """
+
+    def interface_state():
+        """
+        Interface State submenu.
+        """
+
+        def set_interface_down():
+            run_bash_script("set-interface-down", pause=False, capture=False, clear=False, title="Change Interface State")
+
+        def set_interface_up():
+            run_bash_script("set-interface-up", pause=False, capture=False, clear=False, title="Change Interface State")
+
+        actions = {
+            "1": set_interface_down,
+            "2": set_interface_up
+        }
+
+        while True:
+            ui_clear_screen()
+            
+            # Header block
+            ui_standard_header("Set Interface State")
+                    
+            # Menu block                    
+            print("[1] Set interface state DOWN")
+            print("[2] Set interface state UP")
+            print("\n[0] Return to Service Control Menu")
+
+            # Input
+            choice = input("\n[?] Select an option: ")
+
+            if choice == "0":
+                break
+
+            action = actions.get(choice)
+            if action:
+                print()
+                action()
+            else:
+                ui_pause_on_invalid()
+
+    def interface_mode():
+        """
+        Interface mode submenu.
+        """
+
+        def switch_to_managed():
+            run_bash_script("set-mode-managed", pause=False, capture=False, clear=False, title="Change Interface Mode")
+
+        def switch_to_monitor():
+            run_bash_script("set-mode-monitor", pause=False, capture=False, clear=False, title="Change Interface Mode")
+
+        actions = {
+            "1": switch_to_managed,
+            "2": switch_to_monitor
+        }
+
+        while True:
+            ui_clear_screen()
+
+            # Header block
+            ui_standard_header("Set Interface Mode")
+
+            # Menu block
+            print("[1] Set interface mode MANAGED")
+            print("[2] Set interface mode MONITOR")
+            print("\n[0] Return to Service Control Menu")
+
+            # Input
+            choice = input("\n[?] Select an option: ")
+
+            if choice == "0":
+                break
+
+            action = actions.get(choice)
+            if action:
+                print()
+                action()
+            else:
+                ui_pause_on_invalid()
+
+    def interface_reset():
+        """
+        Reset interface submenu.
+        """
+
+        def perform_soft_reset():
+            run_bash_script("reset-interface-soft", pause=False, capture=False, clear=False, title="Reset Interface (Soft)")
+
+        def perform_hard_reset():
+            run_bash_script("reset-interface-hard", pause=False, capture=False, clear=False, title="Reset Interface (Hard)")
+
+        actions = {
+            "1": perform_soft_reset,
+            "2": perform_hard_reset
+        }
+
+        while True:
+            ui_clear_screen()
+
+            # Header block
+            ui_standard_header("Reset Interface")
+
+            print("[1] Perform Soft Reset (Interface Down/Up)")
+            print("[2] Perform Hard Reset (Interface Unload/Reload)")
+            print("\n[0] Return to Service Control Menu")
+
+            # Input
+            choice = input("\n[?] Select an option: ")
+
+            if choice == "0":
+                break
+
+            action = actions.get(choice)
+            if action:
+                print()
+                action()
+            else:
+                ui_pause_on_invalid()
+
+    actions = {
+        "1": interface_state,
+        "2": interface_mode,
+        "3": interface_reset
+    }
+
+    while True:
+        ui_clear_screen()
+
+        # Header block
+        ui_standard_header("Service Control")
+
+        print("[1] Change Interface State")
+        print("[2] Change Interface Mode")
+        print("[3] Reset Interface")
+        print("\n[0] Return to Main Menu")
+
+        # Input
+        choice = input("\n[?] Select an option: ")
+
+        if choice == "0":
+            break
+
+        action = actions.get(choice)
+        if action:
+            ui_clear_screen()
+            action()
+        else:
+            ui_pause_on_invalid()
+
+def help_about():
+    """
+    Help | About submenu.
+    """
+    ui_clear_screen()
+
+    # Header block
+    ui_standard_header("Help | About")
+
+    print("WSTT (Wireless Security Testing Toolkit) provides a menu-driven interface")
+    print("to launch predefined wireless attack scenarios in a controlled")
+    print("testing environment.  Each attack corresponds to a specific threat")
+    print("profile and is executed using underlying Bash-based tools.")
+    print()
+    print("This toolkit is intended for use in isolated lab environments only.")
+    print("All testing must be performed on equipment and networks you own")
+    print("or have explicit permission to test.")
+    print()
+    print("Captured traffic and detections should be handled separately using WSTT.")
+    print()
+    print("Author : Paul Smurthwaite")
+    print("Module : TM470-25B")
+    print("Date   : Mar 2025")
+
+    # Input
+    input("\n[Press Enter to return to menu]")
 
 def main():
     """User input handler."""
 
     while True:
         show_menu()
-        choice = input("\n[+] Select an option: ")
+        choice = input("\n[?] Select an option: ")
         
         if choice == "1":
-            interface_state()
-        elif choice == "2":
-            interface_mode()
-        elif choice == "3":
-            interface_reset()
-        elif choice == "4":
             run_scan()
-        elif choice == "5":
+        elif choice == "2":
             run_capture()
-        elif choice == "6":
+        elif choice == "3":
             run_threat_detection()
+        elif choice == "4":
+            service_control()
+        elif choice == "5":
+            help_about()
         elif choice == "0":
-            print("\nExiting to shell.")
+            print(colour("\n[+] Exiting to shell.", "green"))
             break
         else:
-            pause_on_invalid()
+            ui_pause_on_invalid()
 
 if __name__ == "__main__":
     main()

@@ -1,15 +1,15 @@
-# Absolute Path
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"  # /src/bash
+# Absolute path to /src/bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Project Root
-PROJECT_ROOT="$( cd "$SCRIPT_DIR/../.." && pwd )"  # /WSTT-Project
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 
 # Alfa ACM Interface
 INTERFACE="wlx00c0cab4b58c"
 
 # Output Directories
-SCN_DIR="$PROJECT_ROOT/src/output/scans"
-CAP_DIR="$PROJECT_ROOT/src/output/captures"
+SCN_DIR="$PROJECT_ROOT/output/scans"
+CAP_DIR="$PROJECT_ROOT/output/captures"
 
 # File naming convention
 TIMESTAMP=$(date +"%Y%m%d%H%M%S")
