@@ -15,25 +15,73 @@ Module:      TM470-25B
 import os
 import pyfiglet
 import subprocess
+import sys
 
 # ─── UI Helpers ───
-# UI Colour Dictionary
-COLOURS = {
+# Theme Config
+COLOURS_DARK = {
     "reset":  "\033[0m",
     "bold":   "\033[1m",
-    "grey":   "\033[90m",
-    "red":    "\033[91m",
-    "green":  "\033[92m",
-    "yellow": "\033[93m",
-    "magenta": "\033[95m",
-    "blue":    "\033[38;5;117m",
-    "warn":   "\033[38;5;226m",  # amber
+    "header": "\033[93m",  # yellow
+    "info":   "\033[96m",  # cyan
+    "success":"\033[92m",  # green
+    "warning":"\033[91m",  # red
+    "neutral":"\033[90m"   # grey
 }
+
+COLOURS_LIGHT = {
+    "reset":  "\033[0m",
+    "bold":   "\033[1m",
+    "header": "\033[94m",  # blue
+    "info":   "\033[36m",  # teal
+    "success":"\033[32m",  # dark green
+    "warning":"\033[31m",  # red/maroon
+    "neutral":"\033[30m"   # black/grey
+}
+
+COLOURS_HIGH_CONTRAST = {
+    "reset":  "\033[0m",
+    "bold":   "\033[1m",
+    "header": "\033[97m",  # Bright white
+    "info":   "\033[96m",  # Cyan
+    "success":"\033[92m",  # Bright green
+    "warning":"\033[91m",  # Bright red
+    "neutral":"\033[97m"   # Bright white again
+}
+
+COLOURS_MONOCHROME = {
+    "reset":  "",
+    "bold":   "",
+    "header": "",
+    "info":   "",
+    "success":"",
+    "warning":"",
+    "neutral":""
+}
+
+THEME_MODE = "dark"
+if "--light" in sys.argv:
+    THEME_MODE = "light"
+elif "--high-contrast" in sys.argv:
+    THEME_MODE = "high-contrast"
+elif "--monochrome" in sys.argv:
+    THEME_MODE = "monochrome"
+
+if THEME_MODE == "dark":
+    COLOURS = COLOURS_DARK
+elif THEME_MODE == "light":
+    COLOURS = COLOURS_LIGHT
+elif THEME_MODE == "high-contrast":
+    COLOURS = COLOURS_HIGH_CONTRAST
+elif THEME_MODE == "monochrome":
+    COLOURS = COLOURS_MONOCHROME
+else:
+    COLOURS = COLOURS_DARK  # Fallback default
 
 # UI Colour
 def colour(text, style):
     """
-    Apply ANSI colour styling to text.
+    Apply ANSI colour styling to text based on theme.
     """
     return f"{COLOURS.get(style, '')}{text}{COLOURS['reset']}"
 
@@ -43,14 +91,14 @@ def ui_banner():
     Display ASCII banner.
     """
     ascii_banner = pyfiglet.figlet_format("WSTT", font="ansi_shadow")
-    print(colour(ascii_banner, "blue"))
+    print(colour(ascii_banner, "header"))
 
 # UI Header
 def ui_header(title="Wireless Security Testing Toolkit"):
     """
     Display section header.
     """
-    styled = f"{COLOURS['bold']}{COLOURS['blue']}[ {title} ]{COLOURS['reset']}"
+    styled = f"{COLOURS['bold']}{COLOURS['header']}[ {title} ]{COLOURS['reset']}"
     print(styled)
 
 # UI Divider
@@ -58,7 +106,7 @@ def ui_divider():
     """
     Display divider.
     """
-    print(colour("-----------------------------------", "grey"))
+    print(colour("-----------------------------------", "neutral"))
     print()
 
 # UI Subtitle
@@ -97,7 +145,7 @@ def ui_pause_on_invalid():
     """
     Display invalid input message and pause.
     """
-    print(colour("\n[!] Invalid option. Please try again.", "red"))
+    print(colour("\n[!] Invalid option. Please try again.", "warning"))
     input("[Press Enter to continue]")
 
 # ─── Display Interface ───
@@ -112,15 +160,15 @@ def print_interface_status():
     mode = "AP" if mode_raw.lower() == "ap" else mode_raw.title()
 
     # Determine colours
-    interface_display = colour(interface, "warn")
-    state_display = colour(state, "green" if state.lower() == "up" else "red")
+    interface_display = colour(interface, "info")
+    state_display = colour(state, "success" if state.lower() == "up" else "warning")
 
     if mode_raw.lower() == "managed":
-        mode_display = colour(mode, "green")
+        mode_display = colour(mode, "success")
     elif mode_raw.lower() == "monitor":
-        mode_display = colour(mode, "red")
+        mode_display = colour(mode, "warning")
     elif mode_raw.lower() == "ap":
-        mode_display = colour(mode, "yellow")
+        mode_display = colour(mode, "warning")
     else:
         mode_display = colour(mode, "reset")
 
@@ -228,7 +276,7 @@ def run_bash_script(script_name, pause=True, capture=True, clear=True, title=Non
             subprocess.run(["bash", script_path], check=True)
     
     except subprocess.CalledProcessError as e:
-        print(f"[!] Script failed: {script_name}.sh")
+        print(colour(f"[!] Script failed: {script_name}.sh", "warning"))
         if e.stderr:
             print(e.stderr.strip())
 
@@ -572,7 +620,7 @@ def main():
         elif choice == "5":
             help_about()
         elif choice == "0":
-            print(colour("\n[+] Exiting to shell.", "green"))
+            print(colour("\n[+] Exiting to shell.", "success"))
             break
         else:
             ui_pause_on_invalid()
