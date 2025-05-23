@@ -1,11 +1,23 @@
 #!/bin/bash
 
-# Load helpers
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/fn_load-env.sh"
+# ─── Paths ───
+BASH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CONFIG_DIR="$BASH_DIR/config"
+HELPERS_DIR="$BASH_DIR/helpers"
+SERVICES_DIR="$BASH_DIR/services"
+UTILITIES_DIR="$BASH_DIR/utilities"
+OUTPUT_DIR="$BASH_DIR/../output"
 
-# Parameters
-OUTPUT_FILE="$CAP_DIR/wstt_capture-$FILE_BASE.pcap"
+# ─── Configs ───
+source "$CONFIG_DIR/global.conf"
+source "$CONFIG_DIR/capture.conf"
+
+# ─── Helpers ───
+source "$HELPERS_DIR/fn_print.sh"
+source "$HELPERS_DIR/fn_mode.sh"
+
+# ─── Output File ───
+OUTPUT_FILE="$OUTPUT_DIR/captures/wstt_capture-$FILE_BASE.pcap"
 
 # Input Capture type
 while true; do
@@ -50,13 +62,7 @@ if [ "$CAP_TYPE" = "1" ]; then
         done
 
         # Check mode
-        MODE=$(iw dev "$INTERFACE" info | awk '/type/ {print $2}')
-        if [[ "$MODE" != "monitor" ]]; then
-            print_blank
-            print_action "Setting Monitor mode"
-            bash "$SCRIPT_DIR/set-mode-monitor.sh"
-            print_success "Interface set to Monitor mode"
-        fi
+        ensure_monitor_mode
 
         # Run capture
         print_blank
@@ -79,13 +85,7 @@ if [ "$CAP_TYPE" = "1" ]; then
         done  
 
         # Check mode
-        MODE=$(iw dev "$INTERFACE" info | awk '/type/ {print $2}')
-        if [[ "$MODE" != "monitor" ]]; then
-            print_blank
-            print_action "Setting Monitor mode"
-            bash "$SCRIPT_DIR/set-mode-monitor.sh"
-            print_success "Interface set to Monitor mode"
-        fi
+        ensure_monitor_mode
 
         # Run capture
         print_blank
@@ -128,13 +128,7 @@ elif [ "$CAP_TYPE" = "2" ]; then
     done
 
     # Check mode
-    MODE=$(iw dev "$INTERFACE" info | awk '/type/ {print $2}')
-    if [[ "$MODE" != "monitor" ]]; then
-        print_blank
-        print_action "Setting Monitor mode"
-        bash "$SCRIPT_DIR/set-mode-monitor.sh"
-        print_success "Interface set to Monitor mode"
-    fi
+    ensure_monitor_mode
 
     # Set channel
     print_blank
@@ -205,11 +199,8 @@ else
     print_fail "Invalid Capture type. Please enter 1 or 2."
 fi
 
-# Reset mode to Managed
-print_blank
-print_action "Setting Managed mode"
-bash "$SCRIPT_DIR/set-mode-managed.sh"
-print_success "Interface set to Managed mode"
+# Set Managed mode
+ensure_managed_mode
 
 # File output
 print_blank

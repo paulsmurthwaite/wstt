@@ -137,7 +137,7 @@ def get_interface_details():
     Returns (interface, state, mode) from get-current-interface.sh.
     """
     script_path = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "bash", "get-current-interface.sh")
+        os.path.join(os.path.dirname(__file__), "..", "bash", "services", "get-current-interface.sh")
     )
 
     if not os.path.exists(script_path):
@@ -183,6 +183,7 @@ def show_menu():
     print()
     ui_header("Utilities")
     print("[4] Service Control")
+    print()
     print("[5] Help | About")
 
     # Exit option
@@ -271,14 +272,14 @@ def run_scan():
     Scan traffic handler.
     """
     print()
-    run_bash_script("wstt_scan", pause=True, capture=False, clear=False, title="Scan Wireless Traffic to file")
+    run_bash_script("utilities/wstt_scan", pause=True, capture=False, clear=False, title="Scan Wireless Traffic to file")
 
 def run_capture():
     """
     Capture packets handler.
     """
     print()
-    run_bash_script("wstt_capture", pause=True, capture=False, clear=False, title="Capture Wireless Packets to file")
+    run_bash_script("utilities/wstt_capture", pause=True, capture=False, clear=False, title="Capture Wireless Packets to file")
 
 def run_threat_detection():
     """
@@ -383,10 +384,10 @@ def service_control():
         """
 
         def set_interface_down():
-            run_bash_script("set-interface-down", pause=False, capture=False, clear=False, title="Change Interface State")
+            run_bash_script("services/set-interface-down", pause=False, capture=False, clear=False, title="Change Interface State")
 
         def set_interface_up():
-            run_bash_script("set-interface-up", pause=False, capture=False, clear=False, title="Change Interface State")
+            run_bash_script("services/set-interface-up", pause=False, capture=False, clear=False, title="Change Interface State")
 
         actions = {
             "1": set_interface_down,
@@ -423,10 +424,10 @@ def service_control():
         """
 
         def switch_to_managed():
-            run_bash_script("set-mode-managed", pause=False, capture=False, clear=False, title="Change Interface Mode")
+            run_bash_script("services/set-mode-managed", pause=False, capture=False, clear=False, title="Change Interface Mode")
 
         def switch_to_monitor():
-            run_bash_script("set-mode-monitor", pause=False, capture=False, clear=False, title="Change Interface Mode")
+            run_bash_script("services/set-mode-monitor", pause=False, capture=False, clear=False, title="Change Interface Mode")
 
         actions = {
             "1": switch_to_managed,
@@ -463,10 +464,10 @@ def service_control():
         """
 
         def perform_soft_reset():
-            run_bash_script("reset-interface-soft", pause=False, capture=False, clear=False, title="Reset Interface (Soft)")
+            run_bash_script("services/reset-interface-soft", pause=False, capture=False, clear=False, title="Reset Interface (Soft)")
 
         def perform_hard_reset():
-            run_bash_script("reset-interface-hard", pause=False, capture=False, clear=False, title="Reset Interface (Hard)")
+            run_bash_script("services/reset-interface-hard", pause=False, capture=False, clear=False, title="Reset Interface (Hard)")
 
         actions = {
             "1": perform_soft_reset,

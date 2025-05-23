@@ -1,11 +1,23 @@
 #!/bin/bash
 
-# Load helpers
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/fn_load-env.sh"
+# ─── Paths ───
+BASH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CONFIG_DIR="$BASH_DIR/config"
+HELPERS_DIR="$BASH_DIR/helpers"
+SERVICES_DIR="$BASH_DIR/services"
+UTILITIES_DIR="$BASH_DIR/utilities"
+OUTPUT_DIR="$BASH_DIR/../output"
 
-# Parameters
-OUTPUT_FILE="$SCN_DIR/wstt_scan-$FILE_BASE"
+# ─── Configs ───
+source "$CONFIG_DIR/global.conf"
+source "$CONFIG_DIR/scan.conf"
+
+# ─── Helpers ───
+source "$HELPERS_DIR/fn_print.sh"
+source "$HELPERS_DIR/fn_mode.sh"
+
+# ─── Output File ───
+OUTPUT_FILE="$OUTPUT_DIR/scans/wstt_scan-$FILE_BASE"
 
 # Input scan type
 while true; do
@@ -55,17 +67,10 @@ if [ "$SCAN_TYPE" = "1" ]; then
     done
 
     # Output filename
-    OUTPUT_FILE="$SCN_DIR/wstt_scan-full-${BAND_LABEL}-$FILE_BASE"
+    OUTPUT_FILE="$OUTPUT_DIR/scans/wstt_scan-full-${BAND_LABEL}-$FILE_BASE"
 
     # Check mode
-    MODE=$(iw dev "$INTERFACE" info | awk '/type/ {print $2}')
-    if [[ "$MODE" != "monitor" ]]; then
-        print_blank
-        print_action "Setting Monitor mode"
-        bash "$SCRIPT_DIR/set-mode-monitor.sh"
-        print_success "Interface set to Monitor mode"
-        sleep 3
-    fi
+    ensure_monitor_mode
 
     # Run scan
     sudo timeout "$DURATION" airodump-ng "$INTERFACE" --channel "$CHANNELS" --write "$OUTPUT_FILE" --output-format csv
@@ -74,10 +79,7 @@ if [ "$SCAN_TYPE" = "1" ]; then
     mv "${OUTPUT_FILE}-01.csv" "${OUTPUT_FILE}.csv"
 
     # Reset mode to Managed
-    print_blank
-    print_action "Setting Managed mode"
-    bash "$SCRIPT_DIR/set-mode-managed.sh"
-    print_success "Interface set to Managed mode"
+    ensure_managed_mode
 
     # File output
     if [ -f "${OUTPUT_FILE}.csv" ]; then
@@ -130,17 +132,10 @@ elif [ "$SCAN_TYPE" = "2" ]; then
     done
 
     # Output filename
-    OUTPUT_FILE="$SCN_DIR/wstt_scan-filtered-$FILE_BASE"
+    OUTPUT_FILE="$OUTPUT_DIR/scans/wstt_scan-filtered-$FILE_BASE"
 
     # Check mode
-    MODE=$(iw dev "$INTERFACE" info | awk '/type/ {print $2}')
-    if [[ "$MODE" != "monitor" ]]; then
-        print_blank
-        print_action "Setting Monitor mode"
-        bash "$SCRIPT_DIR/set-mode-monitor.sh"
-        print_success "Interface set to Monitor mode"
-        sleep 3
-    fi
+    ensure_monitor_mode
 
     # Run scan
     sudo timeout "$DURATION" airodump-ng "$INTERFACE" --bssid "$BSSID" --channel "$CHANNEL" --write "$OUTPUT_FILE" --output-format csv
@@ -149,10 +144,7 @@ elif [ "$SCAN_TYPE" = "2" ]; then
     mv "${OUTPUT_FILE}-01.csv" "${OUTPUT_FILE}.csv"
 
     # Reset mode to Managed
-    print_blank
-    print_action "Setting Managed mode"
-    bash "$SCRIPT_DIR/set-mode-managed.sh"
-    print_success "Interface set to Managed mode"
+    ensure_managed_mode
 
     # File output
     if [ -f "${OUTPUT_FILE}.csv" ]; then
