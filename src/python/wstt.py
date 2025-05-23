@@ -174,14 +174,14 @@ def show_menu():
     ui_standard_header("Main Menu")
 
     # Menu block
-    ui_header("Traffic Acquisition")
+    ui_header("Acquisition")
     print("[1] Scan Wireless Traffic")
     print("[2] Capture Wireless Frames")
     print()
-    ui_header("Traffic Analysis")
+    ui_header("Analysis")
     print("[3] Threat Detection")
     print()
-    ui_header("Utilities")
+    ui_header("Services")
     print("[4] Service Control")
     print()
     print("[5] Help | About")
