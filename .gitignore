@@ -18,6 +18,7 @@ backup_wstt.sh
 
 # Ignore legacy files
 legacy/
+archive/
 
 # Ignore VS Code settings (optional)
 .vscode/
