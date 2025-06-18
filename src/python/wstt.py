@@ -334,40 +334,40 @@ def run_threat_detection():
     Wireless threat detection submenu.
     """
     def detect_t001():
-        run_python_script("detect_t001", pause=True, clear=False, title="T001 – Unencrypted Traffic Capture")
+        run_python_script("t001", pause=True, clear=False, title="T001 – Unencrypted Traffic Capture")
 
     def detect_t002():
-        run_python_script("detect_t002", pause=True, clear=False, title="T002 – Probe Request Snooping")
+        run_python_script("t002", pause=True, clear=False, title="T002 – Probe Request Snooping")
 
     def detect_t003():
-        run_python_script("detect_t003", pause=True, clear=False, title="T003 – SSID Harvesting")
+        run_python_script("t003", pause=True, clear=False, title="T003 – SSID Harvesting")
 
     def detect_t004():
-        run_python_script("detect_t004", pause=True, clear=False, title="T004 – Evil Twin Attack")
+        run_python_script("t004", pause=True, clear=False, title="T004 – Evil Twin Attack")
 
     def detect_t005():
-        run_python_script("detect_t005", pause=True, clear=False, title="T005 – Open Rogue AP")
+        run_python_script("t005", pause=True, clear=False, title="T005 – Open Rogue AP")
 
     def detect_t006():
-        run_python_script("detect_t006", pause=True, clear=False, title="T006 – Misconfigured Access Point")
+        run_python_script("t006", pause=True, clear=False, title="T006 – Misconfigured Access Point")
 
     def detect_t007():
-        run_python_script("detect_t007", pause=True, clear=False, title="T007 – Deauthentication Flood")
+        run_python_script("t007", pause=True, clear=False, title="T007 – Deauthentication Flood")
 
     def detect_t008():
-        run_python_script("detect_t008", pause=True, clear=False, title="T008 – Beacon Flood")
+        run_python_script("t008", pause=True, clear=False, title="T008 – Beacon Flood")
 
     def detect_t009():
-        run_python_script("detect_t009", pause=True, clear=False, title="T009 – Authentication Flood")
+        run_python_script("t009", pause=True, clear=False, title="T009 – Authentication Flood")
 
     def detect_t014():
-        run_python_script("detect_t014", pause=True, clear=False, title="T014 – ARP Spoofing from Wireless Entry Point")
+        run_python_script("t014", pause=True, clear=False, title="T014 – ARP Spoofing from Wireless Entry Point")
 
     def detect_t015():
-        run_python_script("detect_t015", pause=True, clear=False, title="T015 – Malicious Hotspot Auto-Connect")
+        run_python_script("t015", pause=True, clear=False, title="T015 – Malicious Hotspot Auto-Connect")
 
     def detect_t016():
-        run_python_script("detect_t016", pause=True, clear=False, title="T016 – Directed Probe Response")
+        run_python_script("t016", pause=True, clear=False, title="T016 – Directed Probe Response")
 
     actions = {
         "1":  detect_t001,
@@ -388,20 +388,16 @@ def run_threat_detection():
         ui_clear_screen()
 
         # Header block
-        ui_standard_header("Wireless Threat Detection")
+        ui_standard_header("Threat Detection Scenarios")
 
-        ui_header("Access Point Threats")
         print("[1]  T001 – Unencrypted Traffic Capture")
         print("[2]  T002 – Probe Request Snooping")
         print("[3]  T003 – SSID Harvesting")
         print("[4]  T004 – Evil Twin Attack")
         print("[5]  T005 – Open Rogue AP")
         print("[6]  T006 – Misconfigured Access Point")
-        print("[7]  T008 – Beacon Flood")
-        print()
-
-        ui_header("Client Exploits")
-        print("[8]  T007 – Deauthentication Flood")
+        print("[7]  T007 – Deauthentication Flood")
+        print("[8]  T008 – Beacon Flood")
         print("[9]  T009 – Authentication Flood")
         print("[10] T014 – ARP Spoofing from Wireless Entry Point")
         print("[11] T015 – Malicious Hotspot Auto-Connect")
@@ -409,7 +405,7 @@ def run_threat_detection():
 
         print("\n[0] Return to Main Menu")
 
-        choice = input("\n[+] Select a threat scenario to run: ")
+        choice = input("\n[+] Select a scenario to run: ")
 
         if choice == "0":
             break

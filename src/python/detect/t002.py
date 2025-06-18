@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""detect_t001.py
+"""t002.py
 
 Information
 
