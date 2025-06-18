@@ -15,76 +15,9 @@ Module:      TM470-25B
 import os
 import pyfiglet
 import subprocess
-import sys
+from helpers.theme import colour
 
 # ─── UI Helpers ───
-# Theme Config
-COLOURS_DARK = {
-    "reset":  "\033[0m",
-    "bold":   "\033[1m",
-    "header": "\033[93m",  # yellow
-    "info":   "\033[96m",  # cyan
-    "success":"\033[92m",  # green
-    "warning":"\033[91m",  # red
-    "neutral":"\033[90m"   # grey
-}
-
-COLOURS_LIGHT = {
-    "reset":  "\033[0m",
-    "bold":   "\033[1m",
-    "header": "\033[94m",  # blue
-    "info":   "\033[36m",  # teal
-    "success":"\033[32m",  # dark green
-    "warning":"\033[31m",  # red/maroon
-    "neutral":"\033[30m"   # black/grey
-}
-
-COLOURS_HIGH_CONTRAST = {
-    "reset":  "\033[0m",
-    "bold":   "\033[1m",
-    "header": "\033[97m",  # Bright white
-    "info":   "\033[96m",  # Cyan
-    "success":"\033[92m",  # Bright green
-    "warning":"\033[91m",  # Bright red
-    "neutral":"\033[97m"   # Bright white again
-}
-
-COLOURS_MONOCHROME = {
-    "reset":  "",
-    "bold":   "",
-    "header": "",
-    "info":   "",
-    "success":"",
-    "warning":"",
-    "neutral":""
-}
-
-THEME_MODE = "dark"
-if "--light" in sys.argv:
-    THEME_MODE = "light"
-elif "--high-contrast" in sys.argv:
-    THEME_MODE = "high-contrast"
-elif "--monochrome" in sys.argv:
-    THEME_MODE = "monochrome"
-
-if THEME_MODE == "dark":
-    COLOURS = COLOURS_DARK
-elif THEME_MODE == "light":
-    COLOURS = COLOURS_LIGHT
-elif THEME_MODE == "high-contrast":
-    COLOURS = COLOURS_HIGH_CONTRAST
-elif THEME_MODE == "monochrome":
-    COLOURS = COLOURS_MONOCHROME
-else:
-    COLOURS = COLOURS_DARK  # Fallback default
-
-# UI Colour
-def colour(text, style):
-    """
-    Apply ANSI colour styling to text based on theme.
-    """
-    return f"{COLOURS.get(style, '')}{text}{COLOURS['reset']}"
-
 # UI Banner
 def ui_banner():
     """
@@ -98,7 +31,7 @@ def ui_header(title="Wireless Security Testing Toolkit"):
     """
     Display section header.
     """
-    styled = f"{COLOURS['bold']}{COLOURS['header']}[ {title} ]{COLOURS['reset']}"
+    styled = colour(colour(f"[ {title} ]", "bold"), "header")
     print(styled)
 
 # UI Divider

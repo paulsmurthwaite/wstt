@@ -1,13 +1,19 @@
 {
+  "ui": {
+    "theme_mode": "dark",
+    "colours": {
+      "reset": "\\033[0m",
+      "bold": "\\033[1m",
+      "header": "\\033[93m",
+      "info": "\\033[96m",
+      "success": "\\033[92m",
+      "warning": "\\033[91m",
+      "neutral": "\\033[90m"
+    }
+  },
+  "paths": {
     "log_file": "./logs/wstt.log",
     "scan_directory": "../output/scans/",
-    "capture_directory": "../output/captures/",
-    "colors": {
-        "success": "\\033[92m",
-        "info": "\\033[90m",
-        "warning": "\\033[93m",
-        "error": "\\033[91m",
-        "title": "\\033[1;94m",
-        "reset": "\\033[0m"
-    }
+    "capture_directory": "../output/captures/"
+  }
 }
