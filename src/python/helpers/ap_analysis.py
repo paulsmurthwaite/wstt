@@ -1,78 +1,72 @@
 #!/usr/bin/env python3
 
 from helpers.output import *
-from scapy.all import RadioTap, Dot11Elt
+from scapy.all import Dot11, Dot11Beacon, Dot11ProbeResp, Dot11Elt
 
-def extract_ssid_from_raw(pkt):
+def parse_ap_frames(packets):
     """
-    Attempts to extract the SSID from a raw 802.11 management frame using Scapy.
+    Parses 802.11 Beacon and Probe Response frames from a Scapy packet list
+    to identify Access Points.
 
     Args:
-        pkt: PyShark packet object with raw bytes enabled.
+        packets: List of Scapy packets.
 
     Returns:
-        SSID string or '<hidden>' if extraction fails.
-    """
-    try:
-        raw = bytes(pkt.get_raw_packet())
-        scapy_pkt = RadioTap(raw)
-
-        # Walk through all Dot11Elt layers to find Tag 0 (SSID)
-        ssid = "<hidden>"
-        elt = scapy_pkt.getlayer(Dot11Elt)
-        while elt:
-            if elt.ID == 0:  # SSID tag
-                if elt.len > 0:
-                    ssid = elt.info.decode(errors="ignore").strip()
-                break
-            elt = elt.payload.getlayer(Dot11Elt)
-        return ssid
-    except Exception as e:
-        print_warning(f"[debug] Scapy SSID extraction failed: {e}")
-        return "<hidden>"
-
-def parse_ap_frames(capture):
-    """
-    Parse beacon and probe response frames from a PCAP capture to identify access points.
-
-    Returns:
-        List of dictionaries with keys: ssid, bssid, privacy, rsn
+        List of dicts containing: ssid, bssid, privacy, rsn
     """
     access_points = []
     seen_bssids = set()
 
-    for pkt in capture:
+    for index, pkt in enumerate(packets, start=1):
         try:
-            subtype_str = pkt.wlan.get_field("fc.type_subtype")
-            if subtype_str is None:
-                continue  # Skip if missing
-            subtype = int(subtype_str, 16)
+            if not pkt.haslayer(Dot11):
+                continue
 
-            ssid = extract_ssid_from_raw(pkt)
+            if not (pkt.haslayer(Dot11Beacon) or pkt.haslayer(Dot11ProbeResp)):
+                continue
 
-            bssid = getattr(pkt.wlan, "bssid", None)
-            privacy = getattr(pkt.wlan, "fixed_capabilities_privacy", "0") == "1"
-            rsn = hasattr(pkt.wlan, "rsn")
+            dot11 = pkt[Dot11]
+            bssid = dot11.addr3 or "<unknown>"
 
-            # Deduplicate by BSSID
+            # Skip broadcast/malformed BSSIDs
             if not bssid or bssid in seen_bssids:
                 continue
             seen_bssids.add(bssid)
 
-            # Debug trace – only for first appearance
-            print_info(f"[trace] Parsed frame: SSID='{ssid}' BSSID={bssid} Privacy={privacy} RSN={rsn}")
+            # Extract SSID from Dot11Elt (tag 0)
+            ssid = "<hidden>"
+            rsn_found = False
+            privacy = False
 
-            # Add to result list
+            elt = pkt[Dot11Elt]
+            while isinstance(elt, Dot11Elt):
+                if elt.ID == 0 and elt.len > 0:
+                    try:
+                        ssid = elt.info.decode(errors="ignore").strip()
+                    except Exception:
+                        ssid = "<decode error>"
+                elif elt.ID == 48:  # RSN tag
+                    rsn_found = True
+                elt = elt.payload.getlayer(Dot11Elt)
+
+            # Determine privacy from capability flags
+            privacy = pkt.sprintf("{Dot11Beacon:%Dot11Beacon.cap%}").find("privacy") != -1 \
+                      or pkt.sprintf("{Dot11ProbeResp:%Dot11ProbeResp.cap%}").find("privacy") != -1
+
+            # Trace log
+            print_info(f"Frame {index}: SSID='{ssid}' BSSID={bssid} Privacy={privacy} RSN={rsn_found}")
+
+            # Add to result
             ap = {
                 "ssid": ssid,
                 "bssid": bssid,
                 "privacy": privacy,
-                "rsn": rsn
+                "rsn": rsn_found
             }
             access_points.append(ap)
 
         except Exception as e:
-            print_error(f"AP frame parse failed: {str(e)}")
+            print_error(f"[x] AP frame parse failed: {e}")
             continue
 
     return access_points

@@ -21,7 +21,7 @@ def main():
     ui_clear_screen()
     ui_header("T001 – Unencrypted Traffic Capture")
     print_blank()
-    print_action("Reading capture files")
+    print_waiting("Reading capture files")
 
     # ─── Load Capture ───
     path, cap = select_capture_file(load=True)
@@ -29,7 +29,8 @@ def main():
         print_error("Capture object was not returned.")
         return
 
-    print_action("Parsing for Access Points")
+    print_blank()
+    print_waiting("Parsing for Access Points")
     access_points = parse_ap_frames(cap)
 
     if not access_points:
