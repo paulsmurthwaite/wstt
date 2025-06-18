@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 
+import os
 from helpers.theme import colour
+
+# ─── UI Header ───
+def ui_header(title="Wireless Security Testing Toolkit"):
+    """
+    Display section header.
+    """
+    styled = colour(colour(f"[ {title} ]", "bold"), "header")
+    print(styled)
+
+# ─── UI Clear Screen ───
+def ui_clear_screen():
+    """
+    Clear terminal screen.
+    """
+    os.system("cls" if os.name == "nt" else "clear")
 
 # ─── Success Message ───
 def print_success(message):
@@ -34,4 +50,4 @@ def print_prompt(message):
 def print_blank():
     print()
 
-__all__ = ["print_success", "print_warning", "print_error", "print_action", "print_info", "print_waiting", "print_prompt", "print_blank"]
+__all__ = ["print_success", "print_warning", "print_error", "print_action", "print_info", "print_waiting", "print_prompt", "print_blank", "ui_header", "ui_clear_screen"]

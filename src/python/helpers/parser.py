@@ -53,12 +53,19 @@ def select_capture_file(load=True):
 
     if load:
         try:
-            print_blank()
             print_waiting("Loading capture file")
-            capture = pyshark.FileCapture(selected_file, keep_packets=True)
-            print_waiting("Capture file loaded - reading data")
+            capture = pyshark.FileCapture(
+                selected_file,
+                display_filter="wlan",
+                use_json=True,
+                include_raw=True,
+                keep_packets=True
+            )
+            print_success("Capture file loaded")
+            print_blank()
         except Exception as e:
             print_error("Failed to load capture file")
+            print_blank()
             import traceback
             print(traceback.format_exc())
             return selected_file, None

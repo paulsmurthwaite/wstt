@@ -27,14 +27,6 @@ def ui_banner():
     ascii_banner = pyfiglet.figlet_format("WSTT", font="ansi_shadow")
     print(colour(ascii_banner, "header"))
 
-# UI Header
-def ui_header(title="Wireless Security Testing Toolkit"):
-    """
-    Display section header.
-    """
-    styled = colour(colour(f"[ {title} ]", "bold"), "header")
-    print(styled)
-
 # UI Divider
 def ui_divider():
     """
@@ -66,13 +58,6 @@ def ui_standard_header(menu_title=None):
     if menu_title:
         ui_header(menu_title)  # Current menu title
         print_blank()
-
-# UI Clear Screen
-def ui_clear_screen():
-    """
-    Clear terminal screen.
-    """
-    os.system("cls" if os.name == "nt" else "clear")
 
 # UI Invalid Option
 def ui_pause_on_invalid():
