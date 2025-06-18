@@ -13,8 +13,6 @@ import json
 import os
 import re
 
-print("[theme.py] LOADED!")
-
 # ─── Default Theme Definitions ───
 COLOURS_DARK = {
     "reset":   "\033[0m",
@@ -92,11 +90,6 @@ for key, value in override.items():
     ansi_code = re.sub(r"\\033", "\033", value)
     if key in COLOURS:
         COLOURS[key] = ansi_code
-
-# ─── DEBUG Printout ───
-if os.getenv("WSTT_DEBUG_THEME") == "1":
-    print(f"[DEBUG] THEME_MODE = {THEME_MODE}")
-    print(f"[DEBUG] COLOURS['header'] = {repr(COLOURS['header'])}")
 
 # ─── Colour Function ───
 def colour(text, style):
