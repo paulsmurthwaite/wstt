@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """
 Theme and colour configuration helper for the WSTT user interface.
 
@@ -15,82 +13,92 @@ import json
 import os
 import re
 
+print("[theme.py] LOADED!")
+
 # ─── Default Theme Definitions ───
 COLOURS_DARK = {
-    "reset":  "\033[0m",
-    "bold":   "\033[1m",
-    "header": "\033[93m",
-    "info":   "\033[96m",
+    "reset":   "\033[0m",
+    "bold":    "\033[1m",
+    "header":  "\033[93m",
+    "info":    "\033[96m",
     "success": "\033[92m",
     "warning": "\033[91m",
-    "neutral": "\033[90m"
+    "error":   "\033[91m",
+    "prompt":  "\033[96m",
+    "neutral": "\033[37m"
 }
 
 COLOURS_LIGHT = {
-    "reset":  "\033[0m",
-    "bold":   "\033[1m",
-    "header": "\033[94m",
-    "info":   "\033[36m",
+    "reset":   "\033[0m",
+    "bold":    "\033[1m",
+    "header":  "\033[94m",
+    "info":    "\033[36m",
     "success": "\033[32m",
     "warning": "\033[31m",
-    "neutral": "\033[30m"
+    "error":   "\033[31m",
+    "prompt":  "\033[36m",
+    "neutral": "\033[90m"
 }
 
 COLOURS_HIGH_CONTRAST = {
-    "reset":  "\033[0m",
-    "bold":   "\033[1m",
-    "header": "\033[97m",
-    "info":   "\033[96m",
+    "reset":   "\033[0m",
+    "bold":    "\033[1m",
+    "header":  "\033[95m",
+    "info":    "\033[94m",
     "success": "\033[92m",
     "warning": "\033[91m",
-    "neutral": "\033[97m"
+    "error":   "\033[41m\033[97m",
+    "prompt":  "\033[96m",
+    "neutral": "\033[93m"
 }
 
 COLOURS_MONOCHROME = {
-    "reset":  "",
-    "bold":   "",
-    "header": "",
-    "info":   "",
+    "reset":   "",
+    "bold":    "",
+    "header":  "",
+    "info":    "",
     "success": "",
     "warning": "",
+    "error":   "",
+    "prompt":  "",
     "neutral": ""
 }
 
-# ─── Load Configuration ───
+# ─── Configuration Loader ───
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "config.json")
-
-# ─── Default theme fallback ───
 THEME_MODE = "dark"
 COLOURS = COLOURS_DARK.copy()
 
 try:
     with open(CONFIG_PATH, "r") as f:
         config = json.load(f)
-        
-        # Load theme mode
         THEME_MODE = config.get("ui", {}).get("theme_mode", "dark").lower()
-        
-        if THEME_MODE == "light":
-            COLOURS = COLOURS_LIGHT.copy()
-        elif THEME_MODE == "high-contrast":
-            COLOURS = COLOURS_HIGH_CONTRAST.copy()
-        elif THEME_MODE == "monochrome":
-            COLOURS = COLOURS_MONOCHROME.copy()
-        else:
-            COLOURS = COLOURS_DARK.copy()  # Default fallback
-
-        # Load optional colour overrides
         override = config.get("ui", {}).get("colours", {})
-        for key, value in override.items():
-            ansi_code = re.sub(r"\\033", "\033", value)
-            if key in COLOURS:
-                COLOURS[key] = ansi_code
-
 except Exception:
-    # If config load fails, fall back to dark theme silently
+    override = {}
+
+# ─── Theme Mapping ───
+if THEME_MODE == "light":
+    COLOURS = COLOURS_LIGHT.copy()
+elif THEME_MODE == "high-contrast":
+    COLOURS = COLOURS_HIGH_CONTRAST.copy()
+elif THEME_MODE == "monochrome":
+    COLOURS = COLOURS_MONOCHROME.copy()
+else:
     COLOURS = COLOURS_DARK.copy()
 
-# ─── Apply Colour to Text ───
+# ─── Apply Colour Overrides ───
+for key, value in override.items():
+    ansi_code = re.sub(r"\\033", "\033", value)
+    if key in COLOURS:
+        COLOURS[key] = ansi_code
+
+# ─── DEBUG Printout ───
+if os.getenv("WSTT_DEBUG_THEME") == "1":
+    print(f"[DEBUG] THEME_MODE = {THEME_MODE}")
+    print(f"[DEBUG] COLOURS['header'] = {repr(COLOURS['header'])}")
+
+# ─── Colour Function ───
 def colour(text, style):
     """
     Apply ANSI styling to a given text string using the specified style key.
@@ -98,12 +106,11 @@ def colour(text, style):
     Args:
         text (str): The string to be styled for CLI display.
         style (str): A style identifier such as 'header', 'success', 'warning', etc.
-        These map to ANSI codes defined by the active theme.
+                     These map to ANSI codes defined by the active theme.
 
     Returns:
         str: The styled string wrapped in the selected ANSI codes and reset sequence.
     """
     return f"{COLOURS.get(style, '')}{text}{COLOURS.get('reset', '')}"
 
-# Optional export
 __all__ = ["colour", "COLOURS", "THEME_MODE"]

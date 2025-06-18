@@ -15,7 +15,8 @@ Module:      TM470-25B
 import os
 import pyfiglet
 import subprocess
-from helpers.theme import colour
+from helpers.theme import *
+from helpers.output import *
 
 # ─── UI Helpers ───
 # UI Banner
@@ -40,7 +41,7 @@ def ui_divider():
     Display divider.
     """
     print(colour("-----------------------------------", "neutral"))
-    print()
+    print_blank()
 
 # UI Subtitle
 def ui_subtitle():
@@ -59,12 +60,12 @@ def ui_standard_header(menu_title=None):
     """
     ui_banner()       # ASCII banner
     ui_header()       # Toolkit title
-    print()
+    print_blank()
     ui_subtitle()     # Divider + interface + service info
 
     if menu_title:
         ui_header(menu_title)  # Current menu title
-        print()
+        print_blank()
 
 # UI Clear Screen
 def ui_clear_screen():
@@ -78,8 +79,10 @@ def ui_pause_on_invalid():
     """
     Display invalid input message and pause.
     """
-    print(colour("\n[!] Invalid option. Please try again.", "warning"))
-    input("[Press Enter to continue]")
+    print_blank()
+    print_warning("Invalid option. Please try again.")
+    print_prompt("Press Enter to continue")
+    input()
 
 # ─── Display Interface ───
 # 
@@ -109,7 +112,7 @@ def print_interface_status():
     print(f"[ Interface       ] {interface_display}")
     print(f"[ Interface State ] {state_display}")
     print(f"[ Interface Mode  ] {mode_display}")
-    print()
+    print_blank()
 
 # ─── Interface Helpers ───
 #
@@ -158,13 +161,13 @@ def show_menu():
     ui_header("Acquisition")
     print("[1] Scan Wireless Traffic")
     print("[2] Capture Wireless Frames")
-    print()
+    print_blank()
     ui_header("Analysis")
     print("[3] Threat Detection")
-    print()
+    print_blank()
     ui_header("Services")
     print("[4] Service Control")
-    print()
+    print_blank()
     print("[5] Help | About")
 
     # Exit option
@@ -186,7 +189,7 @@ def run_bash_script(script_name, pause=True, capture=True, clear=True, title=Non
 
     if title:
         ui_header(title)
-        print()
+        print_blank()
 
     # Bash script path
     script_path = os.path.abspath(
@@ -194,7 +197,7 @@ def run_bash_script(script_name, pause=True, capture=True, clear=True, title=Non
     )
 
     if not os.path.exists(script_path):
-        print(f"[!] Script not found: {script_name}.sh")
+        print_error(f"Script not found: {script_name}.sh")
         return
     
     try:
@@ -209,12 +212,14 @@ def run_bash_script(script_name, pause=True, capture=True, clear=True, title=Non
             subprocess.run(["bash", script_path], check=True)
     
     except subprocess.CalledProcessError as e:
-        print(colour(f"[!] Script failed: {script_name}.sh", "warning"))
+        print_error(f"Script failed: {script_name}.sh")
         if e.stderr:
             print(e.stderr.strip())
 
     if pause:
-        input("\n[Press Enter to return to menu]")
+        print_blank()
+        print_prompt("Press Enter to return to menu")
+        input()
 
 # ─── Python Script Handler ───
 #
@@ -231,35 +236,37 @@ def run_python_script(script_name, pause=True, capture=True, clear=True, title=N
 
     if title:
         ui_header(title)
-        print()
+        print_blank()
 
     script_path = os.path.abspath(
         os.path.join(os.path.dirname(__file__), "detect", f"{script_name}.py")
     )
 
     if not os.path.exists(script_path):
-        print(f"[!] Script not found: {script_name}.py")
+        print_error(f"Script not found: {script_name}.py")
     else:
         try:
             subprocess.run(["python3", script_path], check=True)
         except subprocess.CalledProcessError:
-            print(f"[x] Script failed during execution: {script_name}.py")
+            print_error(f"Script failed during execution: {script_name}.py")
 
     if pause:
-        input("\n[Press Enter to return to menu]")
+        print_blank()
+        print_prompt("Press Enter to return to menu")
+        input()
 
 def run_scan():
     """
     Scan traffic handler.
     """
-    print()
+    print_blank()
     run_bash_script("utilities/wstt_scan", pause=True, capture=False, clear=False, title="Scan Wireless Traffic to file")
 
 def run_capture():
     """
     Capture packets handler.
     """
-    print()
+    print_blank()
     run_bash_script("utilities/wstt_capture", pause=True, capture=False, clear=False, title="Capture Wireless Packets to file")
 
 def run_threat_detection():
@@ -338,14 +345,16 @@ def run_threat_detection():
 
         print("\n[0] Return to Main Menu")
 
-        choice = input("\n[+] Select a scenario to run: ")
+        print_blank()
+        print_prompt("Select a scenario to run: ")
+        choice = input()
 
         if choice == "0":
             break
 
         action = actions.get(choice)
         if action:
-            print()
+            print_blank()
             action()
         else:
             ui_pause_on_invalid()
@@ -383,14 +392,16 @@ def service_control():
             print("\n[0] Return to Service Control Menu")
 
             # Input
-            choice = input("\n[?] Select an option: ")
+            print_blank()
+            print_prompt("Select an option: ")
+            choice = input()
 
             if choice == "0":
                 break
 
             action = actions.get(choice)
             if action:
-                print()
+                print_blank()
                 action()
             else:
                 ui_pause_on_invalid()
@@ -423,14 +434,16 @@ def service_control():
             print("\n[0] Return to Service Control Menu")
 
             # Input
-            choice = input("\n[?] Select an option: ")
+            print_blank()
+            print_prompt("Select an option: ")
+            choice = input()
 
             if choice == "0":
                 break
 
             action = actions.get(choice)
             if action:
-                print()
+                print_blank()
                 action()
             else:
                 ui_pause_on_invalid()
@@ -462,14 +475,16 @@ def service_control():
             print("\n[0] Return to Service Control Menu")
 
             # Input
-            choice = input("\n[?] Select an option: ")
+            print_blank()
+            print_prompt("Select an option: ")
+            choice = input()
 
             if choice == "0":
                 break
 
             action = actions.get(choice)
             if action:
-                print()
+                print_blank()
                 action()
             else:
                 ui_pause_on_invalid()
@@ -492,7 +507,9 @@ def service_control():
         print("\n[0] Return to Main Menu")
 
         # Input
-        choice = input("\n[?] Select an option: ")
+        print_blank()
+        print_prompt("Select an option: ")
+        choice = input()
 
         if choice == "0":
             break
@@ -517,26 +534,30 @@ def help_about():
     print("to launch predefined wireless attack scenarios in a controlled")
     print("testing environment.  Each attack corresponds to a specific threat")
     print("profile and is executed using underlying Bash-based tools.")
-    print()
+    print_blank()
     print("This toolkit is intended for use in isolated lab environments only.")
     print("All testing must be performed on equipment and networks you own")
     print("or have explicit permission to test.")
-    print()
+    print_blank()
     print("Captured traffic and detections should be handled separately using WSTT.")
-    print()
+    print_blank()
     print("Author : Paul Smurthwaite")
     print("Module : TM470-25B")
     print("Date   : Mar 2025")
 
     # Input
-    input("\n[Press Enter to return to menu]")
-
+    print_blank()
+    print_prompt("Press Enter to return to menu")
+    input()
+    
 def main():
     """User input handler."""
 
     while True:
         show_menu()
-        choice = input("\n[?] Select an option: ")
+        print_blank()
+        print_prompt("Select an option: ")
+        choice = input()
         
         if choice == "1":
             run_scan()
@@ -549,7 +570,8 @@ def main():
         elif choice == "5":
             help_about()
         elif choice == "0":
-            print(colour("\n[+] Exiting to shell.", "success"))
+            print_blank()
+            print_success("Exiting to shell.")
             break
         else:
             ui_pause_on_invalid()
