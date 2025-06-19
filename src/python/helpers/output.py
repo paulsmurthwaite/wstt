@@ -46,8 +46,12 @@ def print_waiting(message):
 def print_prompt(message):
     print(f"{colour('[?]', 'prompt')} {message}", end='')
 
+# ─── No formatting Message ───
+def print_none(message):
+    print(f"{message}")
+
 # ─── Blank Line ───
 def print_blank():
     print()
 
-__all__ = ["print_success", "print_warning", "print_error", "print_action", "print_info", "print_waiting", "print_prompt", "print_blank", "ui_header", "ui_clear_screen"]
+__all__ = ["print_success", "print_warning", "print_error", "print_action", "print_info", "print_waiting", "print_prompt", "print_blank", "print_none", "ui_header", "ui_clear_screen"]
