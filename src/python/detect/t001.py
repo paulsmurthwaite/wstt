@@ -1,10 +1,16 @@
+#!/usr/bin/env python3
+
 import os
 import sys
 from tabulate import tabulate
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from helpers.ap_analysis import parse_ap_frames, find_client_associations, inspect_unencrypted_frames
+from helpers.ap_analysis import (
+    parse_ap_frames,
+    find_client_associations,
+    inspect_unencrypted_frames 
+)
 from helpers.parser import select_capture_file
 from helpers.output import *
 from helpers.theme import *
