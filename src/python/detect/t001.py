@@ -36,8 +36,8 @@ def main():
         "client_associations": [],
         "unencrypted_flows": [],
         "status": "NEGATIVE",
-        "risk_level": "None",
-        "justification": []
+        "observation": [],
+        "conclusion": "",
     }
 
     open_aps = [ap for ap in access_points if not ap["privacy"] and not ap["rsn"]]
@@ -45,9 +45,7 @@ def main():
         for ap in open_aps:
             print_warning(f"Open network observed: {ap['ssid']} ({ap['bssid']})")
     else:
-        print_error("No open network observed.")
-
-    print_success("AP parsing complete.")
+        print_error("No open network observed")
 
     # ─── Client Association ───
     print_blank()
@@ -59,57 +57,61 @@ def main():
     else:
         print_error("No Client ⇄ AP Communication observed")
 
-    print_success("Client ⇄ AP association parsing complete.")
-
     # ─── Unencrypted Traffic Analysis ───
     print_blank()
     print_waiting("Parsing for unencrypted application-layer traffic")
     unencrypted = inspect_unencrypted_frames(cap)
     if unencrypted:
-        print_warning("Unencrypted communication observed")
+        print_warning("Unencrypted application-layer traffic observed")
         detection_result["unencrypted_flows"] = unencrypted
     else:
-        print_error("No unencrypted communication observed")
-
-    print_success("Unencrypted application-layer traffic analysis complete")
+        print_error("No unencrypted application-layer traffic observed")
 
     print_blank()
     print_prompt("Press Enter to display the summary")
     input()
     ui_clear_screen()
 
-    # ─── Determine Detection Outcome ───
-    if open_aps and client_links and unencrypted:
+    # ─── Outcome Flags ───
+    has_open_ap = bool(open_aps)
+    has_unencrypted = bool(unencrypted)
+    has_client_links = bool(client_links)
+
+    # ─── Detection Outcome Evaluation ───
+    if has_open_ap and has_unencrypted:
         detection_result["status"] = "POSITIVE"
-        detection_result["risk_level"] = "High"
-        detection_result["justification"] = [
+        detection_result["observations"] = [
             "Open AP detected",
-            "Client communication observed",
-            "Readable payload confirmed"
+            "Readable payload confirmed",
+            "Client communication observed"
         ]
-    elif open_aps and (client_links or unencrypted):
+        detection_result["conclusion"] = "Unencrypted client communication over open wireless observed"
+
+    elif has_open_ap and (has_client_links or has_unencrypted):
         detection_result["status"] = "PARTIAL"
-        detection_result["risk_level"] = "Moderate"
-        detection_result["justification"] = [
+        detection_result["observations"] = [
             "Open AP detected",
             "Partial evidence chain",
             "Some client activity or readable data present"
         ]
-    elif open_aps:
+        detection_result["conclusion"] = "Partial exposure detected via open AP or client behaviour"
+
+    elif has_open_ap:
         detection_result["status"] = "PARTIAL"
-        detection_result["risk_level"] = "Low"
-        detection_result["justification"] = [
+        detection_result["observations"] = [
             "Open AP detected",
             "No client traffic or readable data observed"
         ]
+        detection_result["conclusion"] = "Open wireless detected, but no unencrypted traffic observed"
+
     else:
         detection_result["status"] = "NEGATIVE"
-        detection_result["risk_level"] = "None"
-        detection_result["justification"] = [
+        detection_result["observations"] = [
             "No Open APs detected",
             "No client associations",
             "No readable payloads"
         ]
+        detection_result["conclusion"] = "No exposure to unencrypted wireless traffic detected"
 
     # ─── Final Summary Output ───
     ui_header("T001 – Unencrypted Traffic Capture Detection - Summary")
@@ -142,6 +144,11 @@ def main():
         ))
         print_blank()
 
+    print_info("Observations:")
+    for line in detection_result["observation"]:
+        print_none(f"- {line}")
+    print_blank()
+
     if detection_result["status"] == "POSITIVE":
         print_error("Detection Result: POSITIVE")
     elif detection_result["status"] == "NEGATIVE":
@@ -149,13 +156,7 @@ def main():
     else:
         print_warning("Detection Result: PARTIAL")
 
-    print_info(f"Risk Level: {detection_result['risk_level']}")
-    print_blank()
-    print_info("Justification:")
-    for line in detection_result["justification"]:
-        print_none(f"- {line}")
-    print_blank()
-    print_success("T001 – Unencrypted Traffic Capture Detection - Complete")
+    print_none(f"- {detection_result['conclusion']}")
 
 if __name__ == "__main__":
     main()

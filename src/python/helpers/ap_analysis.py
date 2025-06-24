@@ -480,7 +480,7 @@ def detect_beacon_anomalies(packets):
 
     return anomalies
 
-def detect_client_traffic(packets):
+def detect_client_traffic(packets, known_aps):
     """
     Detects bidirectional encrypted traffic between clients and APs.
     Returns a list of client/AP pairs with frame counts.
@@ -510,11 +510,13 @@ def detect_client_traffic(packets):
         if not src or not dst:
             continue
 
-        # Determine who is client and who is AP based on MAC sorting
-        if int(src.replace(":", ""), 16) < int(dst.replace(":", ""), 16):
-            client, ap = src, dst
+        # Determine who is client and who is AP using known_aps
+        if is_access_point(src, known_aps):
+            ap, client = src, dst
+        elif is_access_point(dst, known_aps):
+            ap, client = dst, src
         else:
-            client, ap = dst, src
+            continue  # Skip if roles cannot be resolved
 
         key = (client, ap)
         pair_counts.setdefault(key, {"c2a": 0, "a2c": 0})
@@ -534,7 +536,7 @@ def detect_client_traffic(packets):
 
     return confirmed_pairs
 
-def detect_client_disassociation(packets):
+def detect_client_disassociation(packets, known_aps):
     """
     Detects disassociation or deauthentication frames sent by clients to APs.
     Returns a list of disconnection events with frame metadata.
@@ -561,9 +563,17 @@ def detect_client_disassociation(packets):
             if not src or not dst:
                 continue
 
+            # Determine AP and client roles
+            if is_access_point(src, known_aps):
+                ap, client = src, dst
+            elif is_access_point(dst, known_aps):
+                ap, client = dst, src
+            else:
+                continue  # Skip if roles can't be determined
+
             disconnections.append({
-                "client": src,
-                "ap": dst,
+                "client": client,
+                "ap": ap,
                 "frame_type": "disassoc" if dot11.subtype == 10 else "deauth",
                 "frame_number": i
             })
