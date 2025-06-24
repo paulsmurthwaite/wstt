@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 
+# ─── External Modules  ───
 import os
 import sys
 from tabulate import tabulate
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+# ─── Local Modules ───
 from helpers.ap_analysis import (
-    detect_rogue_aps,
-    detect_duplicate_handshakes,
     detect_beacon_anomalies,
     detect_client_traffic,
     detect_client_disassociation,
+    detect_duplicate_handshakes,
+    detect_rogue_aps,
     get_known_aps
 )
-from helpers.parser import select_capture_file
 from helpers.output import *
+from helpers.parser import select_capture_file
 from helpers.theme import *
 
 def main():
@@ -39,11 +41,11 @@ def main():
         "client_traffic": [],
         "client_disconnections": [],
         "status": "NEGATIVE",
-        "observation": []
+        "observations": []
     }
 
     # ─── Rogue APs ───
-    print_waiting("Parsing for Rogue APs")
+    print_waiting("SSID collisions (Rogue APs):")
     rogue_aps = detect_rogue_aps(cap)
     detection_result["rogue_aps"] = rogue_aps
     if rogue_aps:
@@ -53,7 +55,7 @@ def main():
 
     # ─── WPA2 Handshakes ───
     print_blank()
-    print_waiting("Parsing for WPA2 Handshakes")
+    print_waiting("Duplicate WPA2 handshakes:")
     dupes = detect_duplicate_handshakes(cap, known_aps)
     detection_result["duplicate_handshakes"] = dupes
     if dupes:
@@ -63,7 +65,7 @@ def main():
 
     # ─── Beacon Anomalies ───
     print_blank()
-    print_waiting("Parsing for Beacon Anomalies")
+    print_waiting("Beacon anomalies:")
     beacons = detect_beacon_anomalies(cap)
     detection_result["beacon_anomalies"] = beacons
     if beacons:
@@ -73,7 +75,7 @@ def main():
 
     # ─── Application-layer traffic ───
     print_blank()
-    print_waiting("Parsing for application-layer traffic")
+    print_waiting("Application-layer traffic:")
     traffic = detect_client_traffic(cap, known_aps)
     detection_result["client_traffic"] = traffic
     if traffic:
@@ -83,7 +85,7 @@ def main():
 
     # ─── Disassociation Frames ───
     print_blank()
-    print_waiting("Parsing for Disassociation Frames")
+    print_waiting("Client disconnection frames:")
     disassoc = detect_client_disassociation(cap, known_aps)
     detection_result["client_disconnections"] = disassoc
     if disassoc:
@@ -106,35 +108,35 @@ def main():
     # ─── Detection Outcome Evaluation ───
     if has_dupes and has_traffic:
         detection_result["status"] = "POSITIVE"
-        detection_result["observation"] = [
+        detection_result["observations"] = [
             "Client completed handshakes with multiple APs",
             "Encrypted traffic was exchanged post-reassociation"
         ]
         if has_disassoc:
-            detection_result["observation"].append("Client was forcibly disconnected before reassociation")
+            detection_result["observations"].append("Client was forcibly disconnected before reassociation")
         if has_rogue or has_anomalies:
-            detection_result["observation"].append("SSID/BSSID reuse or beacon fingerprint mismatch observed")
+            detection_result["observations"].append("SSID/BSSID reuse or beacon fingerprint mismatch observed")
         detection_result["conclusion"] = "Sequence of events is consistent with Evil Twin impersonation"
 
     elif has_dupes:
         detection_result["status"] = "PARTIAL"
-        detection_result["observation"] = [
+        detection_result["observations"] = [
             "Client reassociation with multiple APs detected"
         ]
         if has_disassoc:
-            detection_result["observation"].append("Client was forcibly disconnected before reassociation")
+            detection_result["observations"].append("Client was forcibly disconnected before reassociation")
         detection_result["conclusion"] = "Potential impersonation, but insufficient evidence to confirm"
 
     elif has_rogue or has_anomalies:
         detection_result["status"] = "PARTIAL"
-        detection_result["observation"] = [
+        detection_result["observations"] = [
             "SSID reuse or BSSID spoofing inferred from beacon fingerprint anomalies"
         ]
         detection_result["conclusion"] = "Infrastructure anomaly observed; no client activity detected"
 
     else:
         detection_result["status"] = "NEGATIVE"
-        detection_result["observation"] = [
+        detection_result["observations"] = [
             "No indicators of impersonation detected in capture",
             "No client activity consistent with Evil Twin behaviour"
         ]
@@ -189,7 +191,7 @@ def main():
     print_table("Client Disconnections:", disassoc, {"client": "Client MAC", "ap": "AP MAC", "frame_type": "Type", "frame_number": "Frame"})
 
     print_info("Observations:")
-    for line in detection_result["observation"]:
+    for line in detection_result["observations"]:
         print_none(f"- {line}")
     print_blank()
 

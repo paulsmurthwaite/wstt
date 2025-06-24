@@ -11,6 +11,7 @@ def get_known_aps(packets):
     """
     Extracts all access points observed in the capture file.
     Returns a dictionary mapping BSSID → AP metadata dict.
+    Used by T001
     """
 
     known_aps = {}

@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 
+# ─── External Modules ───
 import os
 import sys
 from tabulate import tabulate
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+# ─── Local Modules ───
 from helpers.ap_analysis import (
-    parse_ap_frames,
     find_client_associations,
-    inspect_unencrypted_frames 
+    inspect_unencrypted_frames,
+    parse_ap_frames
 )
-from helpers.parser import select_capture_file
 from helpers.output import *
+from helpers.parser import select_capture_file
 from helpers.theme import *
 
 def main():
@@ -28,7 +30,7 @@ def main():
         return
 
     print_blank()
-    print_waiting("Parsing for Access Points")
+    print_waiting("Open wireless networks:")
     access_points = parse_ap_frames(cap)
 
     detection_result = {
@@ -36,30 +38,30 @@ def main():
         "client_associations": [],
         "unencrypted_flows": [],
         "status": "NEGATIVE",
-        "observation": [],
+        "observations": [],
         "conclusion": "",
     }
 
     open_aps = [ap for ap in access_points if not ap["privacy"] and not ap["rsn"]]
     if open_aps:
         for ap in open_aps:
-            print_warning(f"Open network observed: {ap['ssid']} ({ap['bssid']})")
+            print_warning(f"Open wireless network observed: {ap['ssid']} ({ap['bssid']})")
     else:
-        print_error("No open network observed")
+        print_error("No open wireless network observed")
 
     # ─── Client Association ───
     print_blank()
-    print_waiting("Parsing for Client ⇄ AP association:")
+    print_waiting("Client-device associations:")
     client_links = find_client_associations(cap, access_points)
     if client_links:
-        print_warning("Client ⇄ AP Communication observed")
+        print_warning("Client-device associations observed")
         detection_result["client_associations"] = client_links
     else:
-        print_error("No Client ⇄ AP Communication observed")
+        print_error("No Client-device associations observed")
 
     # ─── Unencrypted Traffic Analysis ───
     print_blank()
-    print_waiting("Parsing for unencrypted application-layer traffic")
+    print_waiting("Unencrypted application-layer traffic:")
     unencrypted = inspect_unencrypted_frames(cap)
     if unencrypted:
         print_warning("Unencrypted application-layer traffic observed")
@@ -145,7 +147,7 @@ def main():
         print_blank()
 
     print_info("Observations:")
-    for line in detection_result["observation"]:
+    for line in detection_result["observations"]:
         print_none(f"- {line}")
     print_blank()
 
