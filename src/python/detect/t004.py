@@ -9,12 +9,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 # ─── Local Modules ───
 from helpers.ap_analysis import (
-    detect_beacon_anomalies,
-    detect_client_traffic,
-    detect_client_disassociation,
-    detect_duplicate_handshakes,
-    detect_rogue_aps,
-    get_known_aps
+    analyse_capture,
+    detect_rogue_aps_context,
+    detect_beacon_anomalies_context,
+    detect_duplicate_handshakes_context,
+    detect_client_traffic_context
 )
 from helpers.output import *
 from helpers.parser import select_capture_file
@@ -28,181 +27,93 @@ def main():
 
     # ─── Load Capture ───
     path, cap = select_capture_file(load=True)
-    known_aps = get_known_aps(cap)
     if cap is None:
         print_error("Capture object was not returned.")
         return
 
     print_blank()
-    detection_result = {
-        "rogue_aps": [],
-        "duplicate_handshakes": [],
-        "beacon_anomalies": [],
-        "client_traffic": [],
-        "client_disconnections": [],
-        "status": "NEGATIVE",
-        "observations": []
-    }
+    print_waiting("Running single-pass analysis engine...")
 
-    # ─── Rogue APs ───
-    print_waiting("SSID collisions (Rogue APs):")
-    rogue_aps = detect_rogue_aps(cap)
-    detection_result["rogue_aps"] = rogue_aps
-    if rogue_aps:
-        print_warning("SSID collision observed")
-    else:
-        print_error("No SSID collision observed")
-
-    # ─── WPA2 Handshakes ───
+    # --- Run the New Analysis Engine ---
+    context = analyse_capture(cap)
+    print_success("Analysis context created successfully.")
     print_blank()
-    print_waiting("Duplicate WPA2 handshakes:")
-    dupes = detect_duplicate_handshakes(cap, known_aps)
-    detection_result["duplicate_handshakes"] = dupes
-    if dupes:
-        print_warning("Duplicate WPA2 handshakes observed")
-    else:
-        print_error("No duplicate handshakes observed")
 
-    # ─── Beacon Anomalies ───
-    print_blank()
-    print_waiting("Beacon anomalies:")
-    beacons = detect_beacon_anomalies(cap)
-    detection_result["beacon_anomalies"] = beacons
-    if beacons:
-        print_warning("Beacon anomalies observed")
-    else:
-        print_error("No beacon anomalies observed")
+    # --- Run Individual Detection Logics ---
+    print_waiting("Detecting rogue APs (SSID collisions)...")
+    rogue_aps = detect_rogue_aps_context(context)
 
-    # ─── Application-layer traffic ───
-    print_blank()
-    print_waiting("Application-layer traffic:")
-    traffic = detect_client_traffic(cap, known_aps)
-    detection_result["client_traffic"] = traffic
-    if traffic:
-        print_warning("Application-layer traffic observed")
-    else:
-        print_error("No application-layer traffic observed")
+    print_waiting("Detecting beacon anomalies...")
+    beacon_anomalies = detect_beacon_anomalies_context(context)
 
-    # ─── Disassociation Frames ───
-    print_blank()
-    print_waiting("Client disconnection frames:")
-    disassoc = detect_client_disassociation(cap, known_aps)
-    detection_result["client_disconnections"] = disassoc
-    if disassoc:
-        print_warning("Client disconnection frames observed")
-    else:
-        print_error("No client disconnection frames observed")
+    print_waiting("Detecting duplicate handshakes with refactored logic...")
+    attack_chains = detect_duplicate_handshakes_context(context)
+
+    print_waiting("Detecting encrypted client traffic...")
+    client_traffic = detect_client_traffic_context(context)
+
+    print_success("All detection logic executed.")
 
     print_blank()
     print_prompt("Press Enter to display the summary")
     input()
     ui_clear_screen()
 
-    # ─── Outcome Flags ───
-    has_rogue = bool(rogue_aps)
-    has_dupes = bool(dupes)
-    has_traffic = bool(traffic)
-    has_anomalies = bool(beacons)
-    has_disassoc = bool(disassoc)
-
-    # ─── Detection Outcome Evaluation ───
-    if has_dupes and has_traffic:
-        detection_result["status"] = "POSITIVE"
-        detection_result["observations"] = [
-            "Client completed handshakes with multiple APs",
-            "Encrypted traffic was exchanged post-reassociation"
-        ]
-        if has_disassoc:
-            detection_result["observations"].append("Client was forcibly disconnected before reassociation")
-        if has_rogue or has_anomalies:
-            detection_result["observations"].append("SSID/BSSID reuse or beacon fingerprint mismatch observed")
-        detection_result["conclusion"] = "Sequence of events is consistent with Evil Twin impersonation"
-
-    elif has_dupes:
-        detection_result["status"] = "PARTIAL"
-        detection_result["observations"] = [
-            "Client reassociation with multiple APs detected"
-        ]
-        if has_disassoc:
-            detection_result["observations"].append("Client was forcibly disconnected before reassociation")
-        detection_result["conclusion"] = "Potential impersonation, but insufficient evidence to confirm"
-
-    elif has_rogue or has_anomalies:
-        detection_result["status"] = "PARTIAL"
-        detection_result["observations"] = [
-            "SSID reuse or BSSID spoofing inferred from beacon fingerprint anomalies"
-        ]
-        detection_result["conclusion"] = "Infrastructure anomaly observed; no client activity detected"
-
-    else:
-        detection_result["status"] = "NEGATIVE"
-        detection_result["observations"] = [
-            "No indicators of impersonation detected in capture",
-            "No client activity consistent with Evil Twin behaviour"
-        ]
-        detection_result["conclusion"] = "No evidence of Evil Twin activity present"
-
     # ─── Final Summary Output ───
     ui_header("T004 – Evil Twin Detection - Summary")
     print_blank()
 
-    def print_table(title, data, headers):
+    def print_table(title, data, headers="keys"):
         if data:
             print_info(title)
             print(tabulate(data, headers=headers, tablefmt="outline"))
             print_blank()
 
-    print_table("Rogue APs:", rogue_aps, {"ssid": "SSID", "bssids": "BSSIDs", "count": "Count"})
+    print_table("All Discovered Access Points:", list(context['access_points'].values()))
+    print_table("Rogue APs (SSID Collisions):", rogue_aps)
+    print_table("Beacon Anomalies:", beacon_anomalies)
+    print_table("Detected Evil Twin Attack Chains:", attack_chains)
+    print_table("Encrypted Client Traffic:", client_traffic)
 
-    # ─── Format Duplicate Handshake Summary ───
-    dupes_summary = []
-    for entry in dupes:
-        evidence = "None"
-        if entry["handshakes"]:
-            evidence = "Full 4-way"
-        elif entry["partial_type3_only"]:
-            count = len(entry["partial_type3_only"])
-            evidence = f"Partial (Type 3s: {count})"
+    # --- Final Evaluation ---
+    has_attack_chain = bool(attack_chains)
+    has_traffic_with_rogue = False
+    if has_attack_chain and client_traffic:
+        rogue_ap_in_chain = attack_chains[0]['rogue_ap']
+        has_traffic_with_rogue = any(t['ap'] == rogue_ap_in_chain for t in client_traffic)
 
-        deauths = ""
-        if entry["deauths_between"]:
-            deauths = f"{len(entry['deauths_between'])} events"
+    # --- Determine Status and Conclusion ---
+    status = "NEGATIVE"
+    conclusion = "No evidence of an Evil Twin attack was found."
+    observations = ["No indicators of impersonation or client re-association were detected."]
 
-        dupes_summary.append({
-            "client": entry["client"],
-            "ap": entry["ap"],
-            "evidence": evidence,
-            "deauths": deauths,
-            "status": entry["status"]
-        })
-
-    print_table("Duplicate Handshakes:", dupes_summary, {
-        "client": "Client MAC",
-        "ap": "AP MAC",
-        "evidence": "Handshakes",
-        "deauths": "Deauths",
-        "status": "Status"
-    })
-    
-    print_table("Beacon Anomalies:", beacons, {"ssid": "SSID", "anomaly_type": "Anomaly", "bssids": "BSSIDs"})
-    
-    print_table("Client Traffic:", traffic, {"client": "Client MAC", "ap": "AP MAC", "frames": "Frame Count"})
-    
-    print_table("Client Disconnections:", disassoc, {"client": "Client MAC", "ap": "AP MAC", "frame_type": "Type", "frame_number": "Frame"})
+    if has_attack_chain:
+        if has_traffic_with_rogue:
+            status = "POSITIVE"
+            conclusion = "A full Evil Twin attack chain with subsequent traffic was confirmed."
+            observations = ["Client re-associated with a rogue AP.", "Encrypted traffic was observed with the rogue AP."]
+        else:
+            status = "PARTIAL"
+            conclusion = "An Evil Twin re-association was found, but no subsequent traffic was confirmed."
+            observations = ["Client re-associated with a rogue AP, but no MitM traffic was seen."]
+    elif rogue_aps or beacon_anomalies:
+        status = "PARTIAL"
+        conclusion = "Evidence of AP impersonation was found, but no client was observed being attacked."
+        observations = ["SSID collision or beacon anomalies detected, indicating a potential rogue AP."]
 
     print_info("Observations:")
-    for line in detection_result["observations"]:
+    for line in observations:
         print_none(f"- {line}")
     print_blank()
 
-    if detection_result["status"] == "POSITIVE":
+    if status == "POSITIVE":
         print_error("Detection Result: POSITIVE")
-    elif detection_result["status"] == "NEGATIVE":
+    elif status == "NEGATIVE":
         print_success("Detection Result: NEGATIVE")
     else:
         print_warning("Detection Result: PARTIAL")
-    
-    print_none(f"- {detection_result['conclusion']}")
+
+    print_none(f"- {conclusion}")
 
 if __name__ == "__main__":
     main()

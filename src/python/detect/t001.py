@@ -8,20 +8,15 @@ from tabulate import tabulate
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # ─── Local Modules ───
-from helpers.ap_analysis import (
-    find_client_associations,
-    inspect_unencrypted_frames,
-    parse_ap_frames
-)
+from helpers.ap_analysis import analyse_capture, detect_unencrypted_traffic_context
 from helpers.output import *
 from helpers.parser import select_capture_file
 from helpers.theme import *
 
 def main():
     ui_clear_screen()
-    ui_header("T001 – Unencrypted Traffic Capture")
+    ui_header("T001 – Unencrypted Traffic Capture Detection")
     print_blank()
-    print_waiting("Reading capture files")
 
     # ─── Load Capture ───
     path, cap = select_capture_file(load=True)
@@ -29,136 +24,72 @@ def main():
         print_error("Capture object was not returned.")
         return
 
-    print_blank()
-    print_waiting("Open wireless networks:")
-    access_points = parse_ap_frames(cap)
+    # --- Run Analysis ---
+    context = analyse_capture(cap)
+    all_aps = list(context['access_points'].values())
+    open_aps = [ap for ap in all_aps if not ap.get('privacy')]
+    unencrypted_flows = detect_unencrypted_traffic_context(context)
 
-    detection_result = {
-        "aps": access_points,
-        "client_associations": [],
-        "unencrypted_flows": [],
-        "status": "NEGATIVE",
-        "observations": [],
-        "conclusion": "",
-    }
-
-    open_aps = [ap for ap in access_points if not ap["privacy"] and not ap["rsn"]]
-    if open_aps:
-        for ap in open_aps:
-            print_warning(f"Open wireless network observed: {ap['ssid']} ({ap['bssid']})")
-    else:
-        print_error("No open wireless network observed")
-
-    # ─── Client Association ───
-    print_blank()
-    print_waiting("Client-device associations:")
-    client_links = find_client_associations(cap, access_points)
-    if client_links:
-        print_warning("Client-device associations observed")
-        detection_result["client_associations"] = client_links
-    else:
-        print_error("No Client-device associations observed")
-
-    # ─── Unencrypted Traffic Analysis ───
-    print_blank()
-    print_waiting("Unencrypted application-layer traffic:")
-    unencrypted = inspect_unencrypted_frames(cap)
-    if unencrypted:
-        print_warning("Unencrypted application-layer traffic observed")
-        detection_result["unencrypted_flows"] = unencrypted
-    else:
-        print_error("No unencrypted application-layer traffic observed")
-
+    # --- Evaluation ---
+    status = "NEGATIVE"
+    conclusion = "No evidence of unencrypted traffic over an open network was found."
+    observations = ["The network environment appears secure from this threat."]
+    
+    if unencrypted_flows:
+        status = "POSITIVE"
+        conclusion = "Unencrypted client communication over an open wireless network was observed."
+        observations = ["An open (unencrypted) AP was detected.", "A client was observed exchanging readable data over this network."]
+    elif open_aps:
+        status = "PARTIAL"
+        conclusion = "An open (unencrypted) wireless network was detected, but no clients were observed using it."
+        observations = ["An open AP was detected, posing a potential risk.", "No client traffic was captured on the open network."]
+    
     print_blank()
     print_prompt("Press Enter to display the summary")
     input()
     ui_clear_screen()
 
-    # ─── Outcome Flags ───
-    has_open_ap = bool(open_aps)
-    has_unencrypted = bool(unencrypted)
-    has_client_links = bool(client_links)
-
-    # ─── Detection Outcome Evaluation ───
-    if has_open_ap and has_unencrypted:
-        detection_result["status"] = "POSITIVE"
-        detection_result["observations"] = [
-            "Open AP detected",
-            "Readable payload confirmed",
-            "Client communication observed"
-        ]
-        detection_result["conclusion"] = "Unencrypted client communication over open wireless observed"
-
-    elif has_open_ap and (has_client_links or has_unencrypted):
-        detection_result["status"] = "PARTIAL"
-        detection_result["observations"] = [
-            "Open AP detected",
-            "Partial evidence chain",
-            "Some client activity or readable data present"
-        ]
-        detection_result["conclusion"] = "Partial exposure detected via open AP or client behaviour"
-
-    elif has_open_ap:
-        detection_result["status"] = "PARTIAL"
-        detection_result["observations"] = [
-            "Open AP detected",
-            "No client traffic or readable data observed"
-        ]
-        detection_result["conclusion"] = "Open wireless detected, but no unencrypted traffic observed"
-
-    else:
-        detection_result["status"] = "NEGATIVE"
-        detection_result["observations"] = [
-            "No Open APs detected",
-            "No client associations",
-            "No readable payloads"
-        ]
-        detection_result["conclusion"] = "No exposure to unencrypted wireless traffic detected"
-
     # ─── Final Summary Output ───
     ui_header("T001 – Unencrypted Traffic Capture Detection - Summary")
     print_blank()
 
-    if detection_result["aps"]:
+    def print_table(title, data, headers="keys"):
+        if data:
+            print_info(title)
+            print(tabulate(data, headers=headers, tablefmt="outline"))
+            print_blank()
+
+    if all_aps:
         print_info("Access Points:")
         print(tabulate(
-            detection_result["aps"],
-            headers={"ssid": "SSID", "bssid": "BSSID", "privacy": "Privacy", "rsn": "RSN"},
+            all_aps,
+            headers={"bssid": "BSSID", "ssid": "SSID", "channel": "CH", "privacy": "Privacy", "rsn": "RSN"},
             tablefmt="outline"
         ))
         print_blank()
 
-    if detection_result["client_associations"]:
-        print_info("Client Associations:")
-        print(tabulate(
-            detection_result["client_associations"],
-            headers={"client": "Client MAC", "ap": "AP MAC", "frames": "Frame Count"},
-            tablefmt="outline"
-        ))
-        print_blank()
-
-    if detection_result["unencrypted_flows"]:
+    if unencrypted_flows:
         print_info("Unencrypted Flows:")
         print(tabulate(
-            detection_result["unencrypted_flows"],
+            unencrypted_flows,
             headers={"client": "Client MAC", "ap": "AP MAC", "frames": "Frame Count", "layers": "Visible Layers"},
             tablefmt="outline"
         ))
         print_blank()
 
     print_info("Observations:")
-    for line in detection_result["observations"]:
+    for line in observations:
         print_none(f"- {line}")
     print_blank()
 
-    if detection_result["status"] == "POSITIVE":
+    if status == "POSITIVE":
         print_error("Detection Result: POSITIVE")
-    elif detection_result["status"] == "NEGATIVE":
+    elif status == "NEGATIVE":
         print_success("Detection Result: NEGATIVE")
     else:
         print_warning("Detection Result: PARTIAL")
 
-    print_none(f"- {detection_result['conclusion']}")
+    print_none(f"- {conclusion}")
 
 if __name__ == "__main__":
     main()

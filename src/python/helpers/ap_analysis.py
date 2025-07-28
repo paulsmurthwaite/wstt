@@ -7,576 +7,255 @@ from scapy.layers.inet import IP, TCP, UDP, ICMP
 from scapy.layers.dns import DNS
 from scapy.layers.dot11 import Dot11Deauth, Dot11Disas
 
-def get_known_aps(packets):
-    """
-    Extracts all access points observed in the capture file.
-    Returns a dictionary mapping BSSID → AP metadata dict.
-    Used by T001
-    """
+# ─────────────────────────────────────────────────────────────
+# Refactored Single-Pass Analysis Engine (for T004 and future use)
+# ─────────────────────────────────────────────────────────────
+import struct
 
-    known_aps = {}
+def analyse_capture(packets):
+    """
+    Performs a single pass over the provided packets to build a comprehensive
+    AnalysisContext object containing all fundamental evidence.
+
+    :param packets: A list of Scapy packets from a capture file.
+    :return: An AnalysisContext dictionary.
+    """
+    context = {
+        "access_points": {},
+        "eapol_frames": [],
+        "deauth_frames": [],
+        "data_traffic": [],
+    }
 
     for i, pkt in enumerate(packets, start=1):
         if not pkt.haslayer(Dot11):
             continue
-        if not (pkt.haslayer(Dot11Beacon) or pkt.haslayer(Dot11ProbeResp)):
-            continue
 
-        dot11 = pkt[Dot11]
-        bssid = dot11.addr3
-        if not bssid:
-            continue
-
-        # Parse SSID and metadata
-        ssid = "<hidden>"
-        rsn_found = False
-        channel = None
-        beacon_interval = None
-        country = None
-
-        elt = pkt[Dot11Elt]
-        while isinstance(elt, Dot11Elt):
-            if elt.ID == 0 and elt.len > 0:
-                try:
-                    ssid = elt.info.decode(errors="ignore").strip()
-                except Exception:
-                    ssid = "<decode error>"
-            elif elt.ID == 3 and elt.len == 1:
-                channel = elt.info[0]
-            elif elt.ID == 48:
-                rsn_found = True
-            elif elt.ID == 7 and elt.len >= 2:
-                try:
-                    country = elt.info[:2].decode(errors="ignore")
-                except Exception:
-                    country = "<decode error>"
-            elt = elt.payload.getlayer(Dot11Elt)
-
-        # Beacon interval: pulled from Dot11Beacon layer if available
-        beacon_interval = (
-            pkt[Dot11Beacon].beacon_interval
-            if pkt.haslayer(Dot11Beacon) else None
-        )
-
-        known_aps[bssid] = {
-            "ssid": ssid,
-            "rsn": rsn_found,
-            "channel": channel,
-            "interval": beacon_interval,
-            "country": country,
-            "first_seen": i
-        }
-
-    return known_aps
-
-# ─────────────────────────────────────────────────────────────
-# Check if a MAC address belongs to a known access point
-# ─────────────────────────────────────────────────────────────
-def is_access_point(mac, known_aps):
-    """
-    Returns True if the MAC address appears in the known_aps dictionary.
-    """
-    return mac in known_aps
-
-# ─────────────────────────────────────────────────────────────
-# Check if a MAC address appears to be a client device
-# ─────────────────────────────────────────────────────────────
-def is_client(mac, known_aps):
-    """
-    Returns True if the MAC address does NOT appear in the known_aps dictionary.
-    """
-    return mac not in known_aps
-
-def parse_ap_frames(packets):
-    access_points = []
-    seen_bssids = set()
-
-    for pkt in packets:
-        try:
-            if not pkt.haslayer(Dot11):
+        # --- 1. AP Identification (Beacons & Probe Responses) ---
+        if pkt.haslayer(Dot11Beacon) or pkt.haslayer(Dot11ProbeResp):
+            bssid = pkt.addr3
+            if not bssid:
                 continue
-
-            if not (pkt.haslayer(Dot11Beacon) or pkt.haslayer(Dot11ProbeResp)):
-                continue
-
-            dot11 = pkt[Dot11]
-            bssid = dot11.addr3 or "<unknown>"
-
-            if not bssid or bssid in seen_bssids:
-                continue
-            seen_bssids.add(bssid)
 
             ssid = "<hidden>"
+            channel = None
             rsn_found = False
-            privacy = False
+            country = None
 
-            elt = pkt[Dot11Elt]
+            elt = pkt.getlayer(Dot11Elt)
             while isinstance(elt, Dot11Elt):
                 if elt.ID == 0 and elt.len > 0:
                     try:
                         ssid = elt.info.decode(errors="ignore").strip()
                     except Exception:
                         ssid = "<decode error>"
+                elif elt.ID == 3 and elt.len == 1:
+                    channel = elt.info[0]
                 elif elt.ID == 48:
                     rsn_found = True
+                elif elt.ID == 7 and elt.len >= 2:
+                    try:
+                        country = elt.info[:2].decode(errors="ignore")
+                    except Exception:
+                        country = "<decode error>"
                 elt = elt.payload.getlayer(Dot11Elt)
 
-            privacy = pkt.sprintf("{Dot11Beacon:%Dot11Beacon.cap%}").find("privacy") != -1 or \
-                      pkt.sprintf("{Dot11ProbeResp:%Dot11ProbeResp.cap%}").find("privacy") != -1
+            privacy = "privacy" in pkt.sprintf("{Dot11Beacon:%Dot11Beacon.cap%}{Dot11ProbeResp:%Dot11ProbeResp.cap%}")
 
-            ap = {
-                "ssid": ssid,
-                "bssid": bssid,
-                "privacy": privacy,
-                "rsn": rsn_found
-            }
-            access_points.append(ap)
+            if bssid not in context["access_points"]:
+                context["access_points"][bssid] = {
+                    "bssid": bssid, "ssid": ssid, "channel": channel,
+                    "privacy": privacy, "rsn": rsn_found, "country": country,
+                    "vendor": bssid.upper()[0:8],
+                    "interval": pkt[Dot11Beacon].beacon_interval if pkt.haslayer(Dot11Beacon) else None,
+                    "first_seen": i
+                }
 
-        except Exception:
-            continue
-
-    return access_points
-
-def find_client_associations(packets, open_aps):
-    open_bssids = {ap["bssid"] for ap in open_aps if not ap["privacy"] and not ap["rsn"]}
-    pair_counts = {}
-    confirmed_pairs = []
-
-    for pkt in packets:
-        if not pkt.haslayer(Dot11):
-            continue
-
-        dot11 = pkt[Dot11]
-        if dot11.type != 2:
-            continue
-
-        src = dot11.addr2
-        dst = dot11.addr1
-
-        if not src or not dst:
-            continue
-
-        if src in open_bssids and dst != src:
-            key = (dst, src)
-            pair_counts.setdefault(key, {"c2a": 0, "a2c": 0})
-            pair_counts[key]["a2c"] += 1
-        elif dst in open_bssids and src != dst:
-            key = (src, dst)
-            pair_counts.setdefault(key, {"c2a": 0, "a2c": 0})
-            pair_counts[key]["c2a"] += 1
-
-    for (client, ap), counts in pair_counts.items():
-        if counts["c2a"] > 0 and counts["a2c"] > 0:
-            confirmed_pairs.append({
-                "client": client,
-                "ap": ap,
-                "frames": counts["c2a"] + counts["a2c"]
+        # --- 2. Deauthentication & Disassociation Frames ---
+        elif pkt.haslayer(Dot11Deauth) or pkt.haslayer(Dot11Disas):
+            context["deauth_frames"].append({
+                "frame_num": i, "sender": pkt.addr2, "receiver": pkt.addr1,
+                "bssid": pkt.addr3, "reason_code": pkt.reason,
+                "type": "deauth" if pkt.haslayer(Dot11Deauth) else "disassoc"
             })
 
-    return confirmed_pairs
+        # --- 3. EAPOL Handshake Frames ---
+        elif pkt.haslayer(EAPOL) and pkt[EAPOL].type == 3:  # EAPOL-Key
+            try:
+                eapol_payload = pkt[EAPOL].load
+                if len(eapol_payload) < 3: continue
+                key_info = struct.unpack('!H', eapol_payload[1:3])[0]
 
-def inspect_unencrypted_frames(packets):
-    PROTOCOL_LAYERS = [IP, TCP, UDP, ICMP, DNS, HTTPRequest, HTTPResponse]
-    summary = {}
-    total_frames = 0
+                pairwise = (key_info >> 3) & 1
+                ack = (key_info >> 7) & 1
+                mic = (key_info >> 8) & 1
+                secure = (key_info >> 5) & 1
+                install = (key_info >> 6) & 1
 
-    for pkt in packets:
-        if not pkt.haslayer(Dot11):
-            continue
+                msg_num = None
+                if pairwise:
+                    if ack and not mic: msg_num = 1
+                    elif mic and not ack and not secure: msg_num = 2
+                    elif ack and mic and install and secure: msg_num = 3
+                    elif mic and not ack and secure: msg_num = 4
+                if msg_num is None: continue
 
-        dot11 = pkt[Dot11]
-        if dot11.type != 2:
-            continue
+                to_ds, from_ds = pkt.FCfield & 0x1, pkt.FCfield & 0x2
+                if to_ds and not from_ds: client, ap = pkt.addr2, pkt.addr1
+                elif not to_ds and from_ds: client, ap = pkt.addr1, pkt.addr2
+                else: continue
 
-        fc_protected = bool(dot11.FCfield & 0x40)
-        if fc_protected:
-            continue
-
-        src = dot11.addr2
-        dst = dot11.addr1
-        if not src or not dst:
-            continue
-
-        pair = tuple(sorted([src, dst]))
-        if pair not in summary:
-            summary[pair] = {"count": 0, "layers": set()}
-
-        summary[pair]["count"] += 1
-        total_frames += 1
-
-        for layer in PROTOCOL_LAYERS:
-            if pkt.haslayer(layer):
-                summary[pair]["layers"].add(layer.__name__)
-
-    results = []
-    for (mac1, mac2), data in summary.items():
-        results.append({
-            "client": mac1,
-            "ap": mac2,
-            "frames": data["count"],
-            "layers": sorted(data["layers"]) or ["None"]
-        })
-
-    return results
-
-def detect_rogue_aps(packets):
-    """
-    Detects impersonation of a known SSID by:
-    - Multiple BSSIDs advertising the same SSID (SSID collision)
-    - A single BSSID reused with differing fingerprints (BSSID spoofing)
-    Returns a list of suspicious SSID records.
-    Used by T004
-    """
-
-    ssid_bssid_map = {}           # SSID -> set(BSSIDs)
-    ssid_bssid_fingerprints = {}  # SSID -> BSSID -> list of fingerprints
-
-    for i, pkt in enumerate(packets, start=1):
-        if not pkt.haslayer(Dot11):
-            continue
-        if not (pkt.haslayer(Dot11Beacon) or pkt.haslayer(Dot11ProbeResp)):
-            continue
-
-        dot11 = pkt[Dot11]
-        bssid = dot11.addr3
-        if not bssid:
-            continue
-
-        # Extract SSID and fingerprint info
-        ssid = "<hidden>"
-        rsn_found = False
-        elt = pkt[Dot11Elt]
-        while isinstance(elt, Dot11Elt):
-            if elt.ID == 0 and elt.len > 0:
-                try:
-                    ssid = elt.info.decode(errors="ignore").strip()
-                except Exception:
-                    ssid = "<decode error>"
-            elif elt.ID == 48:
-                rsn_found = True
-            elt = elt.payload.getlayer(Dot11Elt)
-
-        vendor = bssid.upper()[0:8]  # MAC OUI
-
-        fingerprint = {
-            "rsn": rsn_found,
-            "vendor": vendor,
-            "first_seen": i
-        }
-
-        # Record BSSID per SSID
-        ssid_bssid_map.setdefault(ssid, set()).add(bssid)
-        ssid_bssid_fingerprints.setdefault(ssid, {}).setdefault(bssid, []).append(fingerprint)
-
-    rogue_entries = []
-
-    for ssid, bssids in ssid_bssid_map.items():
-        if len(bssids) > 1:
-            rogue_entries.append({
-                "ssid": ssid,
-                "bssids": sorted(bssids),
-                "count": len(bssids)
-            })
-        else:
-            bssid = next(iter(bssids))
-            fingerprints = ssid_bssid_fingerprints[ssid][bssid]
-
-            # Check for inconsistent fingerprint values for the same BSSID
-            rsn_set = {fp["rsn"] for fp in fingerprints}
-            vendor_set = {fp["vendor"] for fp in fingerprints}
-
-            if len(rsn_set) > 1 or len(vendor_set) > 1:
-                rogue_entries.append({
-                    "ssid": ssid,
-                    "bssids": [bssid],
-                    "count": 1
+                context["eapol_frames"].append({
+                    "frame_num": i, "client": client, "ap": ap, "msg_num": msg_num
                 })
+            except Exception: continue
 
+        # --- 4. Data Frames ---
+        elif pkt.type == 2: # Data Frame
+            to_ds, from_ds = pkt.FCfield & 0x1, pkt.FCfield & 0x2
+            if to_ds and not from_ds: direction, client, ap = "c2a", pkt.addr2, pkt.addr1
+            elif not to_ds and from_ds: direction, client, ap = "a2c", pkt.addr1, pkt.addr2
+            else: continue
+
+            is_encrypted = bool(pkt.FCfield & 0x40)
+            traffic_entry = {
+                "frame_num": i, "client": client, "ap": ap,
+                "encrypted": is_encrypted, "direction": direction
+            }
+
+            # If unencrypted, check for interesting layers
+            if not is_encrypted:
+                layers = [layer.__name__ for layer in [IP, TCP, UDP, ICMP, DNS, HTTPRequest, HTTPResponse] if pkt.haslayer(layer)]
+                if layers:
+                    traffic_entry['layers'] = layers
+
+            context["data_traffic"].append(traffic_entry)
+    return context
+
+def detect_rogue_aps_context(context):
+    """
+    Detects SSID collisions (multiple BSSIDs advertising the same SSID)
+    by analysing the pre-processed access_points context.
+    """
+    ssid_map = defaultdict(list)
+    for bssid, data in context['access_points'].items():
+        if data["ssid"] and data["ssid"] != "<hidden>":
+            ssid_map[data["ssid"]].append(bssid)
+    rogue_entries = []
+    for ssid, bssids in ssid_map.items():
+        if len(bssids) > 1:
+            rogue_entries.append({"ssid": ssid, "bssids": sorted(bssids), "count": len(bssids)})
     return rogue_entries
 
-def detect_duplicate_handshakes(packets, known_aps):
+def detect_beacon_anomalies_context(context):
     """
-    Detects:
-    1. Full WPA2 4-way handshakes (EAPOL types 1–4)
-    2. Repeated EAPOL type 3 messages separated by deauth/disassoc
-    3. Deauth events without any observed handshake
-    Returns a list of per-client evidence blocks.
-    Used by T004.
+    Detects beacon-level inconsistencies between APs advertising the same SSID
+    by analysing the pre-processed access_points context.
     """
-    handshake_tracker = {}
-    frame_start_map = {}
-    full_sequences = defaultdict(list)
-    partial_type3 = defaultdict(list)
-    deauth_events = []
-
-    for i, pkt in enumerate(packets, start=1):
-        if not pkt.haslayer(Dot11):
-            continue
-
-        dot11 = pkt[Dot11]
-        src = dot11.addr2
-        dst = dot11.addr1
-
-        if not src or not dst:
-            continue
-
-        # Capture deauth/disassociation events
-        if pkt.haslayer(Dot11Deauth) or pkt.haslayer(Dot11Disas):
-            deauth_events.append((i, src, dst))
-            continue
-
-        # Handle EAPOL handshake frames
-        if pkt.haslayer(EAPOL):
-            eapol_type = pkt[EAPOL].type
-
-            # Use known_aps to determine AP and client roles
-            if is_access_point(src, known_aps):
-                ap, client = src, dst
-            elif is_access_point(dst, known_aps):
-                ap, client = dst, src
-            else:
-                continue  # Cannot determine roles reliably
-
-            key = (client, ap)
-
-            if eapol_type == 3:
-                partial_type3[key].append(i)
-
-            if key not in handshake_tracker:
-                handshake_tracker[key] = set()
-                frame_start_map[key] = i
-
-            handshake_tracker[key].add(eapol_type)
-
-            if len(handshake_tracker[key]) == 4:
-                full_sequences[key].append(frame_start_map[key])
-                del handshake_tracker[key]
-                del frame_start_map[key]
-
-    # Final output
-    duplicates = []
-    seen_keys = set(full_sequences.keys()) | set(partial_type3.keys())
-
-    for key in seen_keys:
-        client, ap = key
-        full_frames = full_sequences.get(key, [])
-        partial_frames = partial_type3.get(key, [])
-        all_frames = sorted(partial_frames + full_frames)
-
-        deauths = [
-            idx for idx, s, d in deauth_events
-            if (s == ap and d == client) and any(
-                f1 < idx < f2 for f1, f2 in zip(all_frames, all_frames[1:])
-            )
-        ]
-
-        duplicates.append({
-            "client": client,
-            "ap": ap,
-            "handshakes": full_frames if full_frames else None,
-            "partial_type3_only": partial_frames if partial_frames and not full_frames else None,
-            "deauths_between": deauths if deauths else None,
-            "status": (
-                "complete_match" if full_frames else
-                "partial_match" if partial_frames else
-                "deauth_only"
-            )
-        })
-
-    return duplicates
-
-def detect_beacon_anomalies(packets):
-    """
-    Detects beacon-level inconsistencies between APs advertising the same SSID.
-    Flags mismatches in RSN, vendor OUI, beacon interval, and country code.
-    Returns a list of anomaly reports.
-    Used by T004
-    """
-
-    ssid_info = {}
-
-    for pkt in packets:
-        if not pkt.haslayer(Dot11):
-            continue
-        if not (pkt.haslayer(Dot11Beacon) or pkt.haslayer(Dot11ProbeResp)):
-            continue
-
-        dot11 = pkt[Dot11]
-        bssid = dot11.addr3
-        if not bssid:
-            continue
-
-        ssid = "<hidden>"
-        rsn_found = False
-        country_code = None
-
-        elt = pkt[Dot11Elt]
-        while isinstance(elt, Dot11Elt):
-            if elt.ID == 0 and elt.len > 0:
-                try:
-                    ssid = elt.info.decode(errors="ignore").strip()
-                except Exception:
-                    ssid = "<decode error>"
-            elif elt.ID == 7:  # Country Information
-                try:
-                    country_code = elt.info[:2].decode(errors="ignore")
-                except Exception:
-                    country_code = "<decode error>"
-            elif elt.ID == 48:
-                rsn_found = True
-            elt = elt.payload.getlayer(Dot11Elt)
-
-        vendor_prefix = bssid.upper()[0:8]
-        beacon_interval = pkt[Dot11Beacon].beacon_interval if pkt.haslayer(Dot11Beacon) else None
-
-        ssid_info.setdefault(ssid, []).append({
-            "bssid": bssid,
-            "rsn": rsn_found,
-            "vendor": vendor_prefix,
-            "interval": beacon_interval,
-            "country": country_code
-        })
-
+    ssid_groups = defaultdict(list)
+    for bssid, data in context['access_points'].items():
+        ssid_groups[data['ssid']].append(data)
     anomalies = []
-
-    for ssid, entries in ssid_info.items():
-        if len(entries) < 2:
-            continue
-
-        # RSN inconsistency
-        rsn_set = {e["rsn"] for e in entries}
-        if len(rsn_set) > 1:
-            anomalies.append({
-                "ssid": ssid,
-                "anomaly_type": "RSN mismatch",
-                "bssids": [e["bssid"] for e in entries]
-            })
-
-        # Vendor inconsistency
-        vendor_set = {e["vendor"] for e in entries}
-        if len(vendor_set) > 1:
-            anomalies.append({
-                "ssid": ssid,
-                "anomaly_type": "Vendor OUI mismatch",
-                "bssids": [e["bssid"] for e in entries]
-            })
-
-        # Beacon Interval inconsistency
-        interval_set = {e["interval"] for e in entries if e["interval"] is not None}
-        if len(interval_set) > 1:
-            anomalies.append({
-                "ssid": ssid,
-                "anomaly_type": "Beacon Interval mismatch",
-                "bssids": [e["bssid"] for e in entries]
-            })
-
-        # Country Code inconsistency
-        country_set = {e["country"] for e in entries if e["country"] is not None}
-        if len(country_set) > 1:
-            anomalies.append({
-                "ssid": ssid,
-                "anomaly_type": "Country Code mismatch",
-                "bssids": [e["bssid"] for e in entries]
-            })
-
+    for ssid, entries in ssid_groups.items():
+        if len(entries) < 2 or ssid == "<hidden>": continue
+        def check_inconsistency(prop, type):
+            prop_set = {e.get(prop) for e in entries if e.get(prop) is not None}
+            if len(prop_set) > 1:
+                anomalies.append({"ssid": ssid, "anomaly_type": type, "bssids": [e["bssid"] for e in entries]})
+        check_inconsistency("rsn", "RSN mismatch")
+        check_inconsistency("vendor", "Vendor OUI mismatch")
+        check_inconsistency("interval", "Beacon Interval mismatch")
+        check_inconsistency("country", "Country Code mismatch")
     return anomalies
 
-def detect_client_traffic(packets, known_aps):
+def detect_duplicate_handshakes_context(context):
     """
-    Detects bidirectional encrypted traffic between clients and APs.
-    Returns a list of client/AP pairs with frame counts.
-    Used by T004
-    """
+    Analyses the pre-processed context to find evidence of Evil Twin attacks.
 
-    pair_counts = {}
+    This function identifies the classic Evil Twin attack chain by looking for
+    a client that completes a full 4-way handshake with one AP, and then
+    subsequently completes another handshake with a *different* AP that is
+    impersonating the first one (i.e., has the same SSID).
+
+    It also checks for deauthentication frames between these two handshakes,
+    which is a common part of the attack used to force the client to reconnect.
+
+    :param context: The AnalysisContext object from analyse_capture.
+    :return: A list of dictionaries, each representing a confirmed attack chain.
+    """
+    handshake_sessions = defaultdict(list)
+    for frame in context['eapol_frames']:
+        handshake_sessions[(frame['client'], frame['ap'])].append(frame)
+    complete_handshakes = []
+    for (client, ap), frames in handshake_sessions.items():
+        if {1, 2, 3, 4}.issubset({f['msg_num'] for f in frames}):
+            first_frame = min((f for f in frames if f['msg_num'] == 1), key=lambda x: x['frame_num'])
+            complete_handshakes.append({'client': client, 'ap': ap, 'start_frame': first_frame['frame_num']})
+    client_activity = defaultdict(list)
+    for hs in complete_handshakes:
+        client_activity[hs['client']].append(hs)
+    attack_chains = []
+    for client, handshakes in client_activity.items():
+        if len(handshakes) < 2: continue
+        sorted_hs = sorted(handshakes, key=lambda x: x['start_frame'])
+        for hs1, hs2 in zip(sorted_hs, sorted_hs[1:]):
+            ap1, ap2 = hs1['ap'], hs2['ap']
+            ssid1 = context['access_points'].get(ap1, {}).get('ssid')
+            ssid2 = context['access_points'].get(ap2, {}).get('ssid')
+            if ap1 == ap2 or ssid1 is None or ssid1 == '<hidden>' or ssid1 != ssid2: continue
+            deauth_found = any(
+                d['receiver'] == client and hs1['start_frame'] < d['frame_num'] < hs2['start_frame']
+                for d in context['deauth_frames']
+            )
+            attack_chains.append({
+                'client': client, 'ssid': ssid1, 'legit_ap': ap1, 'rogue_ap': ap2,
+                'deauth_between': deauth_found, 'hs1_start': hs1['start_frame'], 'hs2_start': hs2['start_frame']
+            })
+    return attack_chains
+
+def detect_client_traffic_context(context):
+    """
+    Detects bidirectional encrypted traffic between clients and APs
+    by analysing the pre-processed data_traffic context.
+    """
+    pair_counts = defaultdict(lambda: {"c2a": 0, "a2c": 0})
+    for frame in context['data_traffic']:
+        if not frame['encrypted']: continue
+        key = (frame['client'], frame['ap'])
+        if frame.get('direction'):
+            pair_counts[key][frame['direction']] += 1
     confirmed_pairs = []
-
-    for pkt in packets:
-        if not pkt.haslayer(Dot11):
-            continue
-
-        dot11 = pkt[Dot11]
-
-        # We're only interested in data frames (type 2)
-        if dot11.type != 2:
-            continue
-
-        # Must be encrypted (FCfield bit 0x40 = Protected Frame)
-        if not (dot11.FCfield & 0x40):
-            continue
-
-        src = dot11.addr2
-        dst = dot11.addr1
-
-        if not src or not dst:
-            continue
-
-        # Determine who is client and who is AP using known_aps
-        if is_access_point(src, known_aps):
-            ap, client = src, dst
-        elif is_access_point(dst, known_aps):
-            ap, client = dst, src
-        else:
-            continue  # Skip if roles cannot be resolved
-
-        key = (client, ap)
-        pair_counts.setdefault(key, {"c2a": 0, "a2c": 0})
-
-        if src == client:
-            pair_counts[key]["c2a"] += 1
-        elif src == ap:
-            pair_counts[key]["a2c"] += 1
-
     for (client, ap), counts in pair_counts.items():
         if counts["c2a"] > 0 and counts["a2c"] > 0:
-            confirmed_pairs.append({
-                "client": client,
-                "ap": ap,
-                "frames": counts["c2a"] + counts["a2c"]
-            })
-
+            confirmed_pairs.append({"client": client, "ap": ap, "frames": counts["c2a"] + counts["a2c"]})
     return confirmed_pairs
 
-def detect_client_disassociation(packets, known_aps):
+def detect_unencrypted_traffic_context(context):
     """
-    Detects disassociation or deauthentication frames sent by clients to APs.
-    Returns a list of disconnection events with frame metadata.
-    Used by T004
+    Detects bidirectional unencrypted traffic on open networks and identifies the protocols.
     """
-    from scapy.all import Dot11
+    pair_data = defaultdict(lambda: {"c2a": 0, "a2c": 0, "layers": set()})
 
-    disconnections = []
-
-    for i, pkt in enumerate(packets, start=1):
-        if not pkt.haslayer(Dot11):
+    for frame in context['data_traffic']:
+        if frame['encrypted']:
             continue
+        key = (frame['client'], frame['ap'])
+        if frame.get('direction'):
+            pair_data[key][frame['direction']] += 1
+        if frame.get('layers'):
+            pair_data[key]['layers'].update(frame['layers'])
 
-        dot11 = pkt[Dot11]
-
-        if dot11.type != 0:  # Management frame
-            continue
-
-        # Subtype 10 = Disassociation, 12 = Deauthentication
-        if dot11.subtype in [10, 12]:
-            src = dot11.addr2
-            dst = dot11.addr1
-
-            if not src or not dst:
-                continue
-
-            # Determine AP and client roles
-            if is_access_point(src, known_aps):
-                ap, client = src, dst
-            elif is_access_point(dst, known_aps):
-                ap, client = dst, src
-            else:
-                continue  # Skip if roles can't be determined
-
-            disconnections.append({
-                "client": client,
-                "ap": ap,
-                "frame_type": "disassoc" if dot11.subtype == 10 else "deauth",
-                "frame_number": i
-            })
-
-    return disconnections
+    confirmed_flows = []
+    for (client, ap), data in pair_data.items():
+        # A flow is only confirmed if it's bidirectional
+        if data["c2a"] > 0 and data["a2c"] > 0:
+            # And the AP is an open network (no privacy bit set)
+            ap_properties = context['access_points'].get(ap, {})
+            if not ap_properties.get('privacy'):
+                confirmed_flows.append({
+                    "client": client,
+                    "ap": ap,
+                    "frames": data["c2a"] + data["a2c"],
+                    "layers": sorted(list(data['layers'])) or ["Unknown"]
+                })
+    return confirmed_flows
