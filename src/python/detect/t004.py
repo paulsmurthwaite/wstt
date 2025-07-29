@@ -4,6 +4,8 @@
 import os
 import sys
 from tabulate import tabulate
+import struct
+from scapy.all import EAPOL
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -15,11 +17,13 @@ from helpers.ap_analysis import (
     detect_duplicate_handshakes_context,
     detect_client_traffic_context
 )
-from helpers.output import *
+from helpers.output import * # Imports all standard print functions
+from helpers.output import setup_file_logging # Explicitly import the new logger
 from helpers.parser import select_capture_file
 from helpers.theme import *
 
 def main():
+    setup_file_logging("t004")
     ui_clear_screen()
     ui_header("T004 – Evil Twin Detection")
     print_blank()
@@ -37,7 +41,6 @@ def main():
     # --- Run the New Analysis Engine ---
     context = analyse_capture(cap)
     print_success("Analysis context created successfully.")
-    print_blank()
 
     # --- Run Individual Detection Logics ---
     print_waiting("Detecting rogue APs (SSID collisions)...")
@@ -73,6 +76,7 @@ def main():
     print_table("Rogue APs (SSID Collisions):", rogue_aps)
     print_table("Beacon Anomalies:", beacon_anomalies)
     print_table("Detected Evil Twin Attack Chains:", attack_chains)
+    print_table("EAPOL Handshake Frames Found:", context['eapol_frames'])
     print_table("Encrypted Client Traffic:", client_traffic)
 
     # --- Final Evaluation ---

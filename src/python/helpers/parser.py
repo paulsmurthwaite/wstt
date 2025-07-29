@@ -13,18 +13,26 @@ from scapy.all import rdpcap
 from helpers.output import *
 import json
 
-CONFIG_PATH = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "config", "config.json")
-)
+# Define a robust path to the project root.
+# __file__ is in .../src/python/helpers, so we go up three levels.
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+
+# Build paths from the project root for consistency
+CONFIG_PATH = os.path.join(PROJECT_ROOT, "src", "python", "config", "config.json")
 
 # Load capture directory path from config
 try:
     with open(CONFIG_PATH, "r") as f:
         config = json.load(f)
-        CAPTURE_DIR = os.path.abspath(os.path.join(os.path.dirname(CONFIG_PATH), "..", config["paths"]["capture_directory"]))
+        # Sanitize the path from config to handle legacy formats like "../output/captures"
+        relative_path = config["paths"]["capture_directory"]
+        if relative_path.startswith('../'):
+            relative_path = relative_path[3:] # Strip the leading ../
+        CAPTURE_DIR = os.path.join(PROJECT_ROOT, "src", relative_path)
 except Exception as e:
     print_error(f"Failed to load capture directory from config: {e}")
-    CAPTURE_DIR = "./output/captures"
+    # Fallback to a default location relative to the project root
+    CAPTURE_DIR = os.path.join(PROJECT_ROOT, "src", "output", "captures")
 
 def select_capture_file(load=True):
     """
@@ -68,9 +76,9 @@ def select_capture_file(load=True):
             return selected_file, None
 
         # Load with Scapy
-        print_waiting("Loading capture file")
+        print_waiting("Loading capture file with Scapy...")
         packets = rdpcap(selected_file)
-        print_success("Capture file loaded")
+        print_success(f"Capture file loaded successfully ({len(packets)} packets).")
         return selected_file, packets
 
     except Exception as e:

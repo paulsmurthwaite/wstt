@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import os
+import sys
+from datetime import datetime
 from helpers.theme import colour
 
 # ─── UI Header ───
@@ -54,4 +56,38 @@ def print_none(message):
 def print_blank():
     print()
 
-__all__ = ["print_success", "print_warning", "print_error", "print_action", "print_info", "print_waiting", "print_prompt", "print_blank", "print_none", "ui_header", "ui_clear_screen"]
+# --- Divider Line ---
+def print_line(char='-', length=50):
+    """Prints a divider line."""
+    print(colour(char * length, "neutral"))
+
+# ─── File Logging ───
+LOG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'logs'))
+
+class Logger:
+    """A simple logger class that writes to both terminal and a file."""
+    def __init__(self, terminal, logfile):
+        self.terminal = terminal
+        self.logfile = logfile
+
+    def write(self, message):
+        self.terminal.write(message)
+        self.logfile.write(message)
+
+    def flush(self):
+        self.terminal.flush()
+        self.logfile.flush()
+
+def setup_file_logging(log_prefix):
+    """Redirects stdout to a logger that writes to both screen and file."""
+    os.makedirs(LOG_DIR, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    log_filename = os.path.join(LOG_DIR, f"wstt_{log_prefix}-{timestamp}.log")
+
+    log_file = open(log_filename, 'w', encoding='utf-8')
+    sys.stdout = Logger(sys.stdout, log_file)
+
+    print_success(f"Logging output to {os.path.basename(log_filename)}")
+    print_blank()
+
+__all__ = ["print_success", "print_warning", "print_error", "print_action", "print_info", "print_waiting", "print_prompt", "print_blank", "print_none", "ui_header", "ui_clear_screen", "print_line", "setup_file_logging"]
