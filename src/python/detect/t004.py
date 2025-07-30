@@ -16,6 +16,7 @@ Module:      TM470-25B
 
 # ─── External Modules  ───
 import os
+import logging
 import sys
 from tabulate import tabulate
 
@@ -29,8 +30,8 @@ from helpers.analysis import (
     detect_duplicate_handshakes_context,
     detect_client_traffic_context
 )
+from helpers.logger import setup_logger
 from helpers.output import (
-    setup_file_logging,
     ui_clear_screen,
     ui_header,
     print_blank,
@@ -44,6 +45,8 @@ from helpers.output import (
 )
 from helpers.parser import select_capture_file
 from helpers.theme import *
+
+log = logging.getLogger(__name__)
 
 
 def print_table(title, data, headers="keys"):
@@ -75,7 +78,9 @@ def main():
     of an Evil Twin attack. It concludes by presenting a detailed summary
     and a final verdict.
     """
-    setup_file_logging("t004")
+    setup_logger("t004")
+    log.info("T004 Evil Twin detection script started.")
+
     ui_clear_screen()
     ui_header("T004 – Evil Twin Detection")
     print_blank()
@@ -83,26 +88,39 @@ def main():
 
     path, cap = select_capture_file(load=True)
     if cap is None:
+        log.error("No capture file was selected or loaded. Aborting.")
         print_error("Capture object was not returned.")
         return
+    log.info("Selected capture file: %s", path)
 
     print_blank()
     print_waiting("Running single-pass analysis engine")
+    log.info("Calling the analysis engine.")
     context = analyse_capture(cap)
+    log.info(
+        "Analysis complete. Context created with %d APs, %d deauth frames, and %d EAPOL frames.",
+        len(context['access_points']),
+        len(context['deauth_frames']),
+        len(context['eapol_frames'])
+    )
     print_success("Analysis context created successfully")
 
     print_blank()
     print_waiting("Detecting rogue APs (SSID collisions)")
     rogue_aps = detect_rogue_aps_context(context)
+    log.info("Found %d rogue AP groups (SSID collisions).", len(rogue_aps))
 
     print_waiting("Detecting beacon anomalies")
     beacon_anomalies = detect_beacon_anomalies_context(context)
+    log.info("Found %d beacon anomaly groups.", len(beacon_anomalies))
 
     print_waiting("Detecting duplicate handshakes")
     attack_chains = detect_duplicate_handshakes_context(context)
+    log.info("Found %d potential Evil Twin attack chains.", len(attack_chains))
 
     print_waiting("Detecting encrypted client traffic")
     client_traffic = detect_client_traffic_context(context)
+    log.info("Found %d clients with bidirectional encrypted traffic.", len(client_traffic))
 
     print_success("All detection logic executed")
 
@@ -158,6 +176,8 @@ def main():
         print_warning("Detection Result: PARTIAL")
 
     print_none(f"- {conclusion}")
+    log.info("Final Verdict: %s. Conclusion: %s", status, conclusion)
+
 
 if __name__ == "__main__":
     main()

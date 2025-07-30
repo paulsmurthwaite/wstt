@@ -35,8 +35,9 @@ CONFIG_PATH = os.path.join(PROJECT_ROOT, "src", "python", "config", "config.json
 try:
     with open(CONFIG_PATH, "r") as f:
         config = json.load(f)
-        relative_path = config["paths"]["capture_directory"]
-        CAPTURE_DIR = os.path.abspath(os.path.join(PROJECT_ROOT, "src", relative_path))
+        relative_capture_path = config["paths"]["capture_directory"]
+        python_base_dir = os.path.join(PROJECT_ROOT, "src", "python")
+        CAPTURE_DIR = os.path.abspath(os.path.join(python_base_dir, relative_capture_path))
 except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
     print_error(f"Failed to load capture directory from config: {e}")
     CAPTURE_DIR = os.path.join(PROJECT_ROOT, "src", "output", "captures")

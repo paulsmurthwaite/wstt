@@ -1,19 +1,22 @@
-"""
+#!/usr/bin/env python3
+"""theme.py
+
 Theme and colour configuration helper for the WSTT user interface.
 
-This module loads UI theme settings from config/config.json, determines the selected
-colour scheme (e.g. dark, light, high-contrast, monochrome), and provides a centralised
-colour(text, style) function for applying consistent ANSI styling across CLI output.
+This module loads UI theme settings from the project's configuration file,
+determines the selected colour scheme, and provides a centralized `colour()`
+function for applying consistent ANSI styling across all terminal output.
 
-The active theme is set via the "theme_mode" field in the config file. Optional
-colour overrides can be defined using ANSI escape codes under the "colours" field.
+Author:      Paul Smurthwaite
+Date:        2025-05-15
+Module:      TM470-25B
 """
 
+# ─── External Modules  ───
 import json
 import os
 import re
 
-# ─── Default Theme Definitions ───
 COLOURS_DARK = {
     "reset":   "\033[0m",
     "bold":    "\033[1m",
@@ -62,36 +65,33 @@ COLOURS_MONOCHROME = {
     "neutral": ""
 }
 
-# ─── Configuration Loader ───
+THEMES = {
+    "dark": COLOURS_DARK,
+    "light": COLOURS_LIGHT,
+    "high-contrast": COLOURS_HIGH_CONTRAST,
+    "monochrome": COLOURS_MONOCHROME,
+}
+
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "config.json")
-THEME_MODE = "dark"
-COLOURS = COLOURS_DARK.copy()
 
 try:
     with open(CONFIG_PATH, "r") as f:
         config = json.load(f)
         THEME_MODE = config.get("ui", {}).get("theme_mode", "dark").lower()
-        override = config.get("ui", {}).get("colours", {})
-except Exception:
-    override = {}
+        overrides = config.get("ui", {}).get("colours", {})
+except (FileNotFoundError, json.JSONDecodeError, KeyError):
+    THEME_MODE = "dark"
+    overrides = {}
 
-# ─── Theme Mapping ───
-if THEME_MODE == "light":
-    COLOURS = COLOURS_LIGHT.copy()
-elif THEME_MODE == "high-contrast":
-    COLOURS = COLOURS_HIGH_CONTRAST.copy()
-elif THEME_MODE == "monochrome":
-    COLOURS = COLOURS_MONOCHROME.copy()
-else:
-    COLOURS = COLOURS_DARK.copy()
+# Select the base theme, defaulting to dark if the configured theme is invalid.
+COLOURS = THEMES.get(THEME_MODE, COLOURS_DARK).copy()
 
-# ─── Apply Colour Overrides ───
-for key, value in override.items():
+# Apply any user-defined colour overrides from the configuration.
+for key, value in overrides.items():
     ansi_code = re.sub(r"\\033", "\033", value)
     if key in COLOURS:
         COLOURS[key] = ansi_code
 
-# ─── Colour Function ───
 def colour(text, style):
     """
     Apply ANSI styling to a given text string using the specified style key.
