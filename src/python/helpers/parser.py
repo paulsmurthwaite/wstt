@@ -15,8 +15,12 @@ Module:      TM470-25B
 
 # ─── External Modules  ───
 import os
-from scapy.all import rdpcap
 import json
+import sys
+import threading
+import itertools
+import time
+from scapy.all import rdpcap
 
 # ─── Local Modules ───
 from helpers.output import (
@@ -27,6 +31,7 @@ from helpers.output import (
     print_success,
     print_waiting,
 )
+from helpers.theme import colour
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 
@@ -94,9 +99,28 @@ def select_capture_file(load=True):
         if not load:
             return selected_file, None
 
-        print_blank()
-        print_waiting("Loading capture file")
-        packets = rdpcap(selected_file)
+        # --- Spinner implementation for long-running file load ---
+        done = False
+        def animate():
+            """Function to run in a separate thread to display a spinner."""
+            for c in itertools.cycle(['|', '/', '-', '\\']):
+                if done:
+                    break
+                # Use our theme's colour for consistency
+                spinner_text = f'\r{colour("[~]", "info")} Loading capture file {c}'
+                sys.stdout.write(spinner_text)
+                sys.stdout.flush()
+                time.sleep(0.1)
+            # Clear the line after finishing
+            sys.stdout.write('\r' + ' ' * (len(spinner_text) + 5) + '\r')
+
+        t = threading.Thread(target=animate)
+        t.start()
+
+        packets = rdpcap(selected_file) # This is the long-running task
+        done = True
+        t.join() # Wait for the animation thread to finish cleanly
+
         print_success(f"Capture file loaded successfully ({len(packets)} packets)")
         return selected_file, packets
 
