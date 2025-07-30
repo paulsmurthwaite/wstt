@@ -8,7 +8,7 @@ from tabulate import tabulate
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # ─── Local Modules ───
-from helpers.ap_analysis import analyse_capture, detect_unencrypted_traffic_context
+from python.helpers.analysis import analyse_capture, detect_unencrypted_traffic_context
 from helpers.output import *
 from helpers.parser import select_capture_file
 from helpers.theme import *

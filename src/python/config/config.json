@@ -1,6 +1,6 @@
 {
   "ui": {
-    "theme_mode": "dark"
+    "theme_mode": "light"
   },
   "paths": {
     "log_file": "./logs/wstt.log",

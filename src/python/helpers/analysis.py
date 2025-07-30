@@ -1,5 +1,19 @@
 #!/usr/bin/env python3
+"""analysis.py
 
+Provides the core, single-pass analysis engine for the WSTT.
+
+This module contains the primary `analyse_capture` function, which processes a
+packet capture file once to build a comprehensive "context" object. This
+context is then used by various modular detection functions to efficiently
+identify evidence of specific wireless threats without re-parsing the file.
+
+Author:      Paul Smurthwaite
+Date:        2025-05-15
+Module:      TM470-25B
+"""
+
+# ─── External Modules  ───
 from collections import defaultdict
 import struct
 from scapy.all import Dot11, Dot11Beacon, Dot11ProbeResp, Dot11Elt, EAPOL, Raw
@@ -8,17 +22,16 @@ from scapy.layers.http import HTTPRequest, HTTPResponse
 from scapy.layers.inet import IP, TCP, UDP, ICMP
 from scapy.layers.dns import DNS
 
-# ─────────────────────────────────────────────────────────────
-# Single-Pass Analysis Engine (Scapy-based)
-# ─────────────────────────────────────────────────────────────
-
 def analyse_capture(packets):
     """
-    Performs a single pass over the provided packets to build a comprehensive
-    AnalysisContext object containing all fundamental evidence.
+    Performs a single pass over packets to build a network analysis context.
 
-    :param packets: A list of Scapy packets from a capture file.
-    :return: An AnalysisContext dictionary.
+    Args:
+        packets (scapy.plist.PacketList): A list of Scapy packets from a capture file.
+
+    Returns:
+        dict: A comprehensive context dictionary containing structured data about
+              access points, traffic, and key network events.
     """
     context = {
         "access_points": {},
@@ -31,7 +44,6 @@ def analyse_capture(packets):
         if not pkt.haslayer(Dot11):
             continue
 
-        # --- 1. AP Identification (Beacons & Probe Responses) ---
         if pkt.haslayer(Dot11Beacon) or pkt.haslayer(Dot11ProbeResp):
             bssid = pkt.addr3
             if not bssid:
@@ -65,7 +77,6 @@ def analyse_capture(packets):
                     "first_seen": i
                 }
 
-        # --- 2. Deauthentication & Disassociation Frames ---
         elif pkt.haslayer(Dot11Deauth) or pkt.haslayer(Dot11Disas):
             context["deauth_frames"].append({
                 "time": pkt.time, "frame_num": i, "sender": pkt.addr2,
@@ -73,7 +84,6 @@ def analyse_capture(packets):
                 "type": "deauth" if pkt.haslayer(Dot11Deauth) else "disassoc"
             })
 
-        # --- 3. EAPOL Handshake Frames ---
         elif pkt.haslayer(EAPOL) and pkt[EAPOL].type == 3:  # EAPOL-Key
             try:
                 # To be robust against different Scapy versions, we check for the
@@ -115,7 +125,6 @@ def analyse_capture(packets):
                 })
             except Exception: continue
 
-        # --- 4. Data Frames ---
         elif pkt.type == 2: # Data Frame
             to_ds, from_ds = pkt.FCfield & 0x1, pkt.FCfield & 0x2
 
@@ -145,8 +154,13 @@ def analyse_capture(packets):
 
 def detect_rogue_aps_context(context):
     """
-    Detects SSID collisions (multiple BSSIDs advertising the same SSID)
-    by analysing the pre-processed access_points context.
+    Detects SSID collisions from the analysis context.
+
+    Args:
+        context (dict): The analysis context from `analyse_capture`.
+
+    Returns:
+        list: A list of dictionaries, each representing an SSID collision.
     """
     ssid_map = defaultdict(list)
     for bssid, data in context['access_points'].items():
@@ -160,8 +174,13 @@ def detect_rogue_aps_context(context):
 
 def detect_beacon_anomalies_context(context):
     """
-    Detects beacon-level inconsistencies between APs advertising the same SSID
-    by analysing the pre-processed access_points context.
+    Detects beacon inconsistencies between APs with the same SSID.
+
+    Args:
+        context (dict): The analysis context from `analyse_capture`.
+
+    Returns:
+        list: A list of dictionaries, each representing a detected anomaly.
     """
     ssid_groups = defaultdict(list)
     for bssid, data in context['access_points'].items():
@@ -181,11 +200,17 @@ def detect_beacon_anomalies_context(context):
 
 def detect_duplicate_handshakes_context(context):
     """
-    Analyses the pre-processed context to find evidence of Evil Twin attacks,
-    supporting both "perfect" and "realistic" capture scenarios.
+    Identifies Evil Twin attack chains from the analysis context.
 
-    :param context: The AnalysisContext object from analyse_capture.
-    :return: A list of dictionaries, each representing a confirmed attack chain.
+    This function analyzes EAPOL handshakes, deauthentication events, and
+    traffic patterns to detect when a client is forced off a legitimate AP
+    and re-associates with a rogue AP on the same SSID.
+
+    Args:
+        context (dict): The analysis context from `analyse_capture`.
+
+    Returns:
+        list: A list of dictionaries, each representing a confirmed attack chain.
     """
     handshake_sessions = defaultdict(list)
     for frame in context['eapol_frames']:
@@ -257,8 +282,13 @@ def detect_duplicate_handshakes_context(context):
 
 def detect_client_traffic_context(context):
     """
-    Detects bidirectional encrypted traffic between clients and APs
-    by analysing the pre-processed data_traffic context.
+    Detects bidirectional encrypted traffic between a client and an AP.
+
+    Args:
+        context (dict): The analysis context from `analyse_capture`.
+
+    Returns:
+        list: A list of dictionaries, each representing a confirmed traffic pair.
     """
     pair_counts = defaultdict(lambda: {"c2a": 0, "a2c": 0})
     for frame in context['data_traffic']:
@@ -274,7 +304,16 @@ def detect_client_traffic_context(context):
 
 def detect_unencrypted_traffic_context(context):
     """
-    Detects bidirectional unencrypted traffic on open networks and identifies the protocols.
+    Detects bidirectional unencrypted traffic on open (non-WPA) networks.
+
+    This function identifies clients communicating over unencrypted channels
+    and lists the high-level protocols observed in the traffic.
+
+    Args:
+        context (dict): The analysis context from `analyse_capture`.
+
+    Returns:
+        list: A list of dictionaries, each representing a confirmed unencrypted flow.
     """
     pair_data = defaultdict(lambda: {"c2a": 0, "a2c": 0, "layers": set()})
 
@@ -304,8 +343,19 @@ def detect_unencrypted_traffic_context(context):
 
 def detect_deauth_flood_context(context, threshold=20):
     """
-    Detects deauthentication floods by counting deauth/disassoc frames sent to
-    a specific target within one-second intervals.
+    Detects deauthentication flood attacks from the analysis context.
+
+    This function identifies flood events by counting deauthentication or
+    disassociation frames sent to a specific target within one-second intervals
+    and checking if the count exceeds a given threshold.
+
+    Args:
+        context (dict): The analysis context from `analyse_capture`.
+        threshold (int): The minimum number of deauth/disassoc frames per
+                         second to be considered a flood. Defaults to 20.
+
+    Returns:
+        list: A list of dictionaries, each representing a detected flood event.
     """
     time_buckets = defaultdict(int)
 
