@@ -1,15 +1,16 @@
 # Wireless Security Testing Toolkit (WSTT)
 
 ## **Overview**
-WSTT provides a modular command-line interface for managing wireless interfaces, enabling monitor mode, scanning for access points, capturing traffic, and detecting wireless security threats.
+WSTT is a Python-based toolkit that provides a modular command-line interface for managing wireless interfaces, enabling monitor mode, scanning for access points, capturing traffic, and detecting wireless security threats.
 
-The toolkit simplifies the process of switching between **managed** and **monitor** modes, scanning for wireless traffic, and analysing common wireless attacks through automated detection scripts.
+The toolkit simplifies the process of switching between **managed** and **monitor** modes, scanning for wireless traffic, and analysing common wireless attacks through a powerful single-pass analysis engine and dedicated detection scripts.
 
 ---
 
 ## **Features**
 - Enable **Monitor Mode** and **Managed Mode**
 - **Soft/Hard Reset** wireless interfaces
+- Centralised system interaction via Bash helper scripts
 - View and select available wireless interfaces
 - Perform **Full or Filtered Scans** using `airodump-ng`
 - Capture **Full or Filtered Packet Dumps** using `tcpdump`
@@ -26,14 +27,13 @@ The toolkit simplifies the process of switching between **managed** and **monito
   - T014: ARP Spoofing
   - T015: Malicious Hotspot Auto-Connect
   - T016: Directed Probe Response
-- All detection scripts include:
-  - **Basic Detection Mode** (CLI/Bash)
-  - Placeholder for **Advanced Detection Mode** (Python)
+- Advanced detection using a Python-based analysis engine (`scapy`).
 
 ---
 
 ## **Installation**
 ### **Prerequisites**
+- Core command-line tools:
 ```bash
 sudo apt update
 sudo apt install iw iproute2 aircrack-ng tshark tcpdump

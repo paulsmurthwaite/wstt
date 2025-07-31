@@ -48,11 +48,17 @@ def _run_script(command, script_path, script_name, capture_output, pause, clear,
         log.info("Executing script: %s", os.path.basename(script_path))
         subprocess.run(command, check=True, capture_output=capture_output, text=True)
     except subprocess.CalledProcessError as e:
-        log.error("Script %s failed with exit code %d.", script_name, e.returncode)
-        print_error(f"Script failed during execution: {script_name}")
-        # Only print stderr if it was captured
-        if capture_output and e.stderr:
-            print(e.stderr.strip())
+        # An exit code of 1 is used by confirmation prompts to signal user
+        # cancellation. In this case, we should return silently without
+        # displaying an error or pausing.
+        if e.returncode == 1:
+            log.info("Script %s cancelled by user.", script_name)
+            return
+        else:
+            log.error("Script %s failed with exit code %d.", script_name, e.returncode)
+            print_error(f"Script failed during execution: {script_name}")
+            if capture_output and e.stderr:
+                print(e.stderr.strip())
 
     if pause:
         print_blank()
@@ -60,12 +66,13 @@ def _run_script(command, script_path, script_name, capture_output, pause, clear,
         input()
 
 
-def run_bash_script(script_name, pause=True, capture=True, clear=True, title=None):
+def run_bash_script(script_name, args=None, pause=True, capture=True, clear=True, title=None):
     """
     Executes a Bash script located under /src/bash.
 
     Args:
         script_name (str): Script name without extension.
+        args (list, optional): A list of string arguments to pass to the script.
         pause (bool): Whether to wait for user input after execution.
         capture (bool): If True, captures stdout/stderr. If False, allows
                         the script to print directly to the terminal.
@@ -76,6 +83,8 @@ def run_bash_script(script_name, pause=True, capture=True, clear=True, title=Non
         os.path.join(os.path.dirname(__file__), "..", "..", "bash", f"{script_name}.sh")
     )
     command = ["bash", script_path]
+    if args:
+        command.extend(args)
     _run_script(command, script_path, f"{script_name}.sh", capture, pause, clear, title)
 
 

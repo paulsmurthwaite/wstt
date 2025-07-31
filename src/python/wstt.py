@@ -24,6 +24,8 @@ from helpers.system import (
 )
 from helpers.ui import (
     display_main_menu,
+    display_scan_menu,
+    display_capture_menu,
     display_threat_detection_menu,
     display_service_control_menu,
     display_interface_state_menu,
@@ -39,17 +41,59 @@ def run_scan():
     """
     Scan traffic handler.
     """
-    log.info("User selected 'Scan Wireless Traffic'.")
-    print_blank()
-    run_bash_script("utilities/wstt_scan", pause=True, capture=False, clear=False, title="Scan Wireless Traffic to file")
+    log.info("Entering Scan submenu.")
+
+    actions = {
+        "1": lambda: run_bash_script("utilities/wstt_scan", args=["--full"], pause=True, capture=False, clear=True, title="Full Scan"),
+        "2": lambda: run_bash_script("utilities/wstt_scan", args=["--channel"], pause=True, capture=False, clear=True, title="Filtered Scan (Channel)"),
+        "3": lambda: run_bash_script("utilities/wstt_scan", args=["--bssid"], pause=True, capture=False, clear=True, title="Filtered Scan (BSSID & Channel)"),
+    }
+
+    while True:
+        display_scan_menu()
+
+        print_blank()
+        print_prompt("Select a scan type: ")
+        choice = input()
+
+        if choice == "0":
+            break
+        log.info("User selected scan type: %s", choice)
+
+        action = actions.get(choice)
+        if action:
+            action()
+        else:
+            ui_pause_on_invalid()
 
 def run_capture():
     """
     Capture packets handler.
     """
-    log.info("User selected 'Capture Wireless Frames'.")
-    print_blank()
-    run_bash_script("utilities/wstt_capture", pause=True, capture=False, clear=False, title="Capture Wireless Packets to file")
+    log.info("Entering Capture submenu.")
+
+    actions = {
+        "1": lambda: run_bash_script("utilities/wstt_capture", args=["--full"], pause=True, capture=False, clear=True, title="Full Capture"),
+        "2": lambda: run_bash_script("utilities/wstt_capture", args=["--channel"], pause=True, capture=False, clear=True, title="Filtered Capture (Channel)"),
+        "3": lambda: run_bash_script("utilities/wstt_capture", args=["--bssid"], pause=True, capture=False, clear=True, title="Filtered Capture (BSSID & Channel)"),
+    }
+
+    while True:
+        display_capture_menu()
+
+        print_blank()
+        print_prompt("Select a capture type: ")
+        choice = input()
+
+        if choice == "0":
+            break
+        log.info("User selected capture type: %s", choice)
+
+        action = actions.get(choice)
+        if action:
+            action()
+        else:
+            ui_pause_on_invalid()
 
 def run_threat_detection():
     """

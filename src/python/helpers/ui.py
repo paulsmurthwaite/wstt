@@ -120,6 +120,26 @@ def display_main_menu():
 
     print("\n[0] Exit")
 
+def display_scan_menu():
+    """Display the scan submenu."""
+    title = "Scan Wireless Traffic"
+    items = [
+        "[1] Full Scan (all channels)",
+        "[2] Filtered Scan (by channel)",
+        "[3] Filtered Scan (by BSSID & channel)",
+    ]
+    _display_generic_menu(title, items, "Return to Main Menu")
+
+def display_capture_menu():
+    """Display the capture submenu."""
+    title = "Capture Wireless Frames"
+    items = [
+        "[1] Full Capture (all channels)",
+        "[2] Filtered Capture (by channel)",
+        "[3] Filtered Capture (by BSSID & channel)",
+    ]
+    _display_generic_menu(title, items, "Return to Main Menu")
+
 def display_threat_detection_menu():
     """Display the threat detection submenu."""
     title = "Threat Detection Scenarios"

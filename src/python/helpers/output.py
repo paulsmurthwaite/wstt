@@ -20,10 +20,15 @@ from datetime import datetime
 
 # ─── Local Modules ───
 from helpers.theme import colour
+from helpers.version import VERSION, RELEASE_DATE
 
 # ─── UI Header ───
 def ui_header(title="Wireless Security Testing Toolkit"):
     """Displays a styled section header."""
+    # If the title is the default, append version info
+    if title == "Wireless Security Testing Toolkit":
+        title = f"{title} {VERSION} - {RELEASE_DATE}"
+
     styled = colour(colour(f"[ {title} ]", "bold"), "header")
     print(styled)
 
