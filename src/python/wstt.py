@@ -14,10 +14,12 @@ Module:      TM470-25B
 
 # ─── External Modules  ───
 import logging
+import sys
 
 # ─── Local Modules ───
 from helpers.logger import setup_logger
 from helpers.output import print_blank, print_prompt, print_success
+from helpers.preflight import run_preflight_checks
 from helpers.system import (
     run_bash_script,
     run_python_script,
@@ -268,6 +270,11 @@ def help_about():
     
 def main():
     """User input handler."""
+
+    # Run pre-flight checks before initializing the UI or logger.
+    # If checks fail, the function will print errors and return False.
+    if not run_preflight_checks():
+        sys.exit(1)
 
     setup_logger("main_session")
     log.info("WSTT main menu initialised.")
