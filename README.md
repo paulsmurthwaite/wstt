@@ -1,89 +1,98 @@
-# Wireless Security Testing Toolkit (WSTT)
+# Wireless Security Testing Toolkit (WSTT) v0.1-alpha
 
-## **Overview**
-WSTT is a Python-based toolkit that provides a modular command-line interface for managing wireless interfaces, enabling monitor mode, scanning for access points, capturing traffic, and detecting wireless security threats.
+## Overview
+WSTT is a Python-based toolkit that provides a menu-driven command-line interface for managing wireless interfaces, scanning for networks, capturing traffic, and simulating/detecting common wireless security threats.
 
-The toolkit simplifies the process of switching between **managed** and **monitor** modes, scanning for wireless traffic, and analysing common wireless attacks through a powerful single-pass analysis engine and dedicated detection scripts.
-
----
-
-## **Features**
-- Enable **Monitor Mode** and **Managed Mode**
-- **Soft/Hard Reset** wireless interfaces
-- Centralised system interaction via Bash helper scripts
-- View and select available wireless interfaces
-- Perform **Full or Filtered Scans** using `airodump-ng`
-- Capture **Full or Filtered Packet Dumps** using `tcpdump`
-- Automatically detect threats in `.pcap` and `.csv` files:
-  - T001: Unencrypted Traffic
-  - T002: Probe Request Snooping
-  - T003: SSID Harvesting
-  - T004: Evil Twin AP
-  - T005: Open Rogue AP
-  - T006: Misconfigured AP
-  - T007: Deauthentication Flood
-  - T008: Beacon Flood
-  - T009: Authentication Flood
-  - T014: ARP Spoofing
-  - T015: Malicious Hotspot Auto-Connect
-  - T016: Directed Probe Response
-- Advanced detection using a Python-based analysis engine (`scapy`).
+The toolkit is designed to be run in a controlled lab environment, simplifying the process of executing complex scenarios and acquiring data for security analysis.
 
 ---
 
-## **Installation**
-### **Prerequisites**
-- Core command-line tools:
+## Features
+- **Menu-Driven Interface**: A simple, clean UI for accessing all toolkit functions.
+- **Acquisition Utilities**:
+  - Perform **Full or Filtered Scans** using `airodump-ng`.
+  - Capture **Full or Filtered Packet Dumps** using `tcpdump`.
+- **Threat Simulation & Detection**:
+  - Execute predefined attack scenarios to generate traffic for analysis.
+  - Run detection scripts against captured `.pcap` files.
+  - Current threats include Deauthentication Floods, ARP Spoofing, Evil Twin attacks, and more.
+- **Service Control**:
+  - Easily switch a wireless interface between **Managed** and **Monitor** modes.
+  - Perform soft/hard resets of the wireless interface.
+- **Centralised Configuration**: Key parameters are managed in a central configuration file for consistency.
+- **Session Logging**: All actions are logged to a timestamped file in `src/python/logs/` for auditing.
+
+---
+
+## Installation
+
+### 1. System Prerequisites
+Install the necessary command-line tools for wireless interaction. 
+
 ```bash
 sudo apt update
-sudo apt install iw iproute2 aircrack-ng tshark tcpdump
+sudo apt install aircrack-ng tcpdump iw iproute2
 ```
 
 ### Clone the repository
 ```bash
-git clone https://github.com/your-repo/wstt.git
+git clone https://github.com/paulsmurthwaite/wstt.git
 cd wstt
 ```
 
 ### Make scripts executable
 ```bash
-chmod +x scripts/*.sh
-chmod +x helpers/*.sh
+chmod +x src/python/wstt.py
+```
+
+### Python Dependencies
+Install the required Python packages. It is highly recommended to use a Python virtual environment.
+
+### Create and activate a virtual environment (optional but recommended)
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### Install dependencies
+```bash
+pip install scapy pyfiglet tabulate
 ```
 
 ---
 
-## **Usage Overview**
-Run capture or scan scripts from the `scripts/` directory:
+## Usage
+Launch the main toolkit interface from the project's root directory:
 
 ```bash
-./scripts/scan.sh       # Full or filtered scan
-./scripts/capture.sh    # Full or filtered packet capture
-./scripts/detect_t001.sh  # Run specific threat detection (e.g. T001)
+src/python/wstt.py
 ```
 
 ---
 
-## **Detection Modes**
-Each detection script supports:
-- `[1] Basic`: Lightweight Bash-based detection
-- `[2] Advanced`: Placeholder for Python-based analysis
+## Logging
+The toolkit features a robust, session-based logging system designed for auditing and debugging. When the application starts, it creates a new log file for that specific session.
 
-Files are auto-selected based on recency, or prompted when multiple exist.
-
----
-
-## **Logging**
-All key events and actions are logged to `wstt.log` (optional).  
-Manual review of scan and capture artefacts is also supported via detection scripts.
+- **Location**: All log files are stored in the `src/python/logs/` directory.
+- **Naming**: Each log file is timestamped (e.g., `wstt_log_YYYYMMDD-HHMMSS.log`) to ensure that logs from different sessions are kept separate and easy to find.
+- **Content**: The logs capture key user actions, script executions, and any errors that occur, providing a detailed record of each session.
 
 ---
 
-## **Configuration**
-WSTT uses `config.sh` to set:
-- `INTERFACE` (e.g. wlan0mon)
-- `CAP_DIR`, `SCN_DIR` for output
-- Default durations and naming conventions
+## Configuration
+
+WSTT uses a dual-configuration system to separate runtime operational parameters from core application settings.
+
+### Bash Configuration (`src/bash/config/`)
+This directory contains `.conf` files that control the behaviour of all Bash scripts, including the acquisition utilities and threat scenarios.
+
+- **`global.conf`**: The primary configuration file. It defines key parameters used by the Scan and Capture utilities, such as the default wireless `INTERFACE`, `DEFAULT_DURATION`, `DEFAULT_CHANNEL`, and `DEFAULT_BSSID`.
+
+- **Scenario-specific configs** (e.g., `t014.conf`): Each threat scenario has its own configuration file to set parameters specific to that simulation, such as target IP addresses or attack duration.
+
+### Python Configuration (`src/python/config/`)
+
+- **`config.json`**: This file configures the Python front-end and analysis engine. It is primarily used to define application-level settings, such as the directory paths for storing logs and packet captures.
 
 ---
 
