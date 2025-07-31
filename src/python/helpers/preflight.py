@@ -27,6 +27,13 @@ ESSENTIAL_DEPS = {
     "iw": "iw",
 }
 
+# A dictionary mapping essential Python packages to their PyPI install names.
+PYTHON_DEPS = {
+    "scapy": "scapy",
+    "pyfiglet": "pyfiglet",
+    "tabulate": "tabulate",
+}
+
 # Define a single source of truth for the project's root directory
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 
@@ -99,6 +106,20 @@ def _check_dependencies():
             all_deps_found = False
     return all_deps_found
 
+def _check_python_dependencies():
+    """Verify that all essential Python packages are installed."""
+    print_info("Checking for Python dependencies...")
+    all_deps_found = True
+    for package_name, install_name in PYTHON_DEPS.items():
+        try:
+            # Use __import__ to check for module existence by its string name
+            __import__(package_name)
+        except ImportError:
+            print_error(f"Python package '{package_name}' not found in the current environment.")
+            print_action(f"Please install it using: 'sudo pip install {install_name}'")
+            all_deps_found = False
+    return all_deps_found
+
 def _check_wireless_interface():
     """Verify that a usable wireless interface is available."""
     interface = get_current_interface()
@@ -120,7 +141,7 @@ def run_preflight_checks():
     print_blank()
 
     # Chain checks together; if one fails, the rest won't run.
-    if not (_check_root() and _check_dependencies() and _check_config_files() and _check_output_directories() and _check_wireless_interface()):
+    if not (_check_root() and _check_dependencies() and _check_python_dependencies() and _check_config_files() and _check_output_directories() and _check_wireless_interface()):
         print_blank()
         print_error("Environment checks failed. Please resolve the issues above and restart.")
         return False

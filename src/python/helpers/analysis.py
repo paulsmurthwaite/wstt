@@ -14,9 +14,9 @@ Module:      TM470-25B
 """
 
 # ─── External Modules  ───
-from collections import defaultdict
+from collections import defaultdict, Counter
 import struct
-from scapy.all import Dot11, Dot11Beacon, Dot11ProbeResp, Dot11Elt, EAPOL, Raw
+from scapy.all import Dot11, Dot11Beacon, Dot11ProbeResp, Dot11ProbeReq, Dot11Elt, EAPOL, Raw
 from scapy.layers.dot11 import Dot11Deauth, Dot11Disas
 from scapy.layers.http import HTTPRequest, HTTPResponse
 from scapy.layers.inet import IP, TCP, UDP, ICMP
@@ -38,6 +38,7 @@ def analyse_capture(packets):
         "eapol_frames": [],
         "deauth_frames": [],
         "data_traffic": [],
+        "probe_requests": defaultdict(set),
     }
 
     for i, pkt in enumerate(packets, start=1):
@@ -76,6 +77,13 @@ def analyse_capture(packets):
                     "interval": pkt[Dot11Beacon].beacon_interval if pkt.haslayer(Dot11Beacon) else None,
                     "first_seen": i
                 }
+
+        elif pkt.haslayer(Dot11ProbeReq):
+            source_mac = pkt.addr2
+            ssid = pkt.info.decode('utf-8', errors='ignore').strip()
+            if not ssid:
+                ssid = "<Broadcast>"
+            context["probe_requests"][source_mac].add(ssid)
 
         elif pkt.haslayer(Dot11Deauth) or pkt.haslayer(Dot11Disas):
             context["deauth_frames"].append({
