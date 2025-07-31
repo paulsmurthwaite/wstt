@@ -53,6 +53,7 @@ def analyse_capture(packets):
             ssid = "<hidden>"
             channel = None
             rsn_found = False
+            wpa_found = False
             country = None
 
             elt = pkt.getlayer(Dot11Elt)
@@ -62,6 +63,8 @@ def analyse_capture(packets):
                     except Exception: ssid = "<decode error>"
                 elif elt.ID == 3 and elt.len == 1: channel = elt.info[0]
                 elif elt.ID == 48: rsn_found = True
+                elif elt.ID == 221 and elt.info.startswith(b'\x00\x50\xf2\x01'):
+                    wpa_found = True
                 elif elt.ID == 7 and elt.len >= 2:
                     try: country = elt.info[:2].decode(errors="ignore")
                     except Exception: country = "<decode error>"
@@ -72,7 +75,7 @@ def analyse_capture(packets):
             if bssid not in context["access_points"]:
                 context["access_points"][bssid] = {
                     "bssid": bssid, "ssid": ssid, "channel": channel,
-                    "privacy": privacy, "rsn": rsn_found, "country": country,
+                    "privacy": privacy, "wpa": wpa_found, "rsn": rsn_found, "country": country,
                     "vendor": bssid.upper()[0:8],
                     "interval": pkt[Dot11Beacon].beacon_interval if pkt.haslayer(Dot11Beacon) else None,
                     "first_seen": i
@@ -348,6 +351,40 @@ def detect_unencrypted_traffic_context(context):
                     "layers": sorted(list(data['layers'])) or ["Unknown"]
                 })
     return confirmed_flows
+
+def detect_misconfigured_aps_context(context):
+    """
+    Detects misconfigured APs based on their advertised security protocols.
+
+    This function iterates through all discovered access points and classifies
+    their security posture based on a tiered risk model (Open, WEP, WPA1).
+
+    Args:
+        context (dict): The analysis context from `analyse_capture`.
+
+    Returns:
+        list: A list of dictionaries, each representing a misconfigured AP
+              and the reason for its classification.
+    """
+    misconfigured_aps = []
+    for bssid, ap in context['access_points'].items():
+        reason = None
+        # Tier 1: Critical Misconfigurations
+        if not ap.get('privacy'):
+            reason = "Critical: Open Network"
+        elif not ap.get('wpa') and not ap.get('rsn'):
+            # If privacy is on but no WPA/RSN, it's WEP
+            reason = "Critical: WEP (Legacy)"
+        # Tier 2: Serious Misconfigurations
+        elif ap.get('wpa') and not ap.get('rsn'):
+            reason = "Serious: WPA1 (Legacy)"
+
+        if reason:
+            entry = ap.copy()
+            entry['reason'] = reason
+            misconfigured_aps.append(entry)
+
+    return sorted(misconfigured_aps, key=lambda x: x.get('ssid', ''))
 
 def detect_deauth_flood_context(context, threshold=20):
     """
