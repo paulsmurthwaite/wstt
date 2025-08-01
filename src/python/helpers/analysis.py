@@ -16,8 +16,8 @@ Module:      TM470-25B
 # ─── External Modules  ───
 from collections import defaultdict, Counter
 import struct
-from scapy.all import Dot11, Dot11Beacon, Dot11ProbeResp, Dot11ProbeReq, Dot11Elt, EAPOL, Raw
-from scapy.layers.dot11 import Dot11Deauth, Dot11Disas
+from scapy.all import Dot11, Dot11Beacon, Dot11ProbeResp, Dot11ProbeReq, Dot11Elt, EAPOL, Raw, ARP
+from scapy.layers.dot11 import Dot11Deauth, Dot11Disas, Dot11Auth
 from scapy.layers.http import HTTPRequest, HTTPResponse
 from scapy.layers.inet import IP, TCP, UDP, ICMP
 from scapy.layers.dns import DNS
@@ -35,10 +35,14 @@ def analyse_capture(packets):
     """
     context = {
         "access_points": {},
+        "beacon_frames": [],
+        "auth_frames": [],
         "eapol_frames": [],
         "deauth_frames": [],
         "data_traffic": [],
-        "probe_requests": defaultdict(set),
+        "arp_frames": [],
+        "probe_requests": [],
+        "probe_responses": [],
     }
 
     for i, pkt in enumerate(packets, start=1):
@@ -46,6 +50,30 @@ def analyse_capture(packets):
             continue
 
         if pkt.haslayer(Dot11Beacon) or pkt.haslayer(Dot11ProbeResp):
+            # Add to beacon_frames list for flood detection, which specifically
+            # uses beacon frames, not probe responses.
+            if pkt.haslayer(Dot11Beacon):
+                context["beacon_frames"].append({
+                    "time": pkt.time,
+                    "bssid": pkt.addr3
+                })
+
+            if pkt.haslayer(Dot11ProbeResp):
+				# In a probe response, addr1 is the client, addr3 is the BSSID
+                client = pkt.addr1
+                ap = pkt.addr3
+                ssid = "<unknown>"
+                elt = pkt.getlayer(Dot11Elt)
+                while isinstance(elt, Dot11Elt):
+                    if elt.ID == 0 and elt.len > 0:
+                        try: ssid = elt.info.decode(errors="ignore").strip()
+                        except Exception: ssid = "<decode error>"
+                        break
+                    elt = elt.payload.getlayer(Dot11Elt)
+                context["probe_responses"].append({
+                    "time": pkt.time, "frame_num": i, "ap": ap, "client": client, "ssid": ssid
+                })
+
             bssid = pkt.addr3
             if not bssid:
                 continue
@@ -82,17 +110,39 @@ def analyse_capture(packets):
                 }
 
         elif pkt.haslayer(Dot11ProbeReq):
-            source_mac = pkt.addr2
-            ssid = pkt.info.decode('utf-8', errors='ignore').strip()
+            client = pkt.addr2
+            try:
+                ssid = pkt.info.decode('utf-8', errors='ignore').strip()
+            except Exception:
+                ssid = "<decode error>"
             if not ssid:
                 ssid = "<Broadcast>"
-            context["probe_requests"][source_mac].add(ssid)
-
+            context["probe_requests"].append({
+                "time": pkt.time, "frame_num": i, "client": client, "ssid": ssid
+            })
         elif pkt.haslayer(Dot11Deauth) or pkt.haslayer(Dot11Disas):
             context["deauth_frames"].append({
                 "time": pkt.time, "frame_num": i, "sender": pkt.addr2,
                 "receiver": pkt.addr1, "bssid": pkt.addr3, "reason_code": pkt.reason,
                 "type": "deauth" if pkt.haslayer(Dot11Deauth) else "disassoc"
+            })
+
+        elif pkt.haslayer(Dot11Auth):
+            context["auth_frames"].append({
+                "time": pkt.time,
+                "frame_num": i,
+                "sender": pkt.addr2,
+                "receiver": pkt.addr1
+            })
+
+        elif pkt.haslayer(ARP):
+            context["arp_frames"].append({
+                "frame_num": i,
+                "op": pkt[ARP].op, # 1=who-has, 2=is-at
+                "hwsrc": pkt[ARP].hwsrc, # Sender MAC
+                "psrc": pkt[ARP].psrc, # Sender IP
+                "hwdst": pkt[ARP].hwdst, # Target MAC
+                "pdst": pkt[ARP].pdst, # Target IP
             })
 
         elif pkt.haslayer(EAPOL) and pkt[EAPOL].type == 3:  # EAPOL-Key
@@ -420,6 +470,176 @@ def detect_deauth_flood_context(context, threshold=20):
                 "target": target,
                 "frame_count": count,
                 "threshold": threshold
+            })
+
+    return sorted(flood_events, key=lambda x: x['timestamp'])
+
+def detect_directed_probe_response_context(context, time_window=2):
+    """
+    Detects directed probe responses, a key indicator of an AP impersonation attack.
+
+    This function correlates Probe Requests from clients with subsequent Probe
+    Responses from APs. It flags responses as suspicious if they are not from
+    an AP that is actively broadcasting beacons.
+
+    Args:
+        context (dict): The analysis context from `analyse_capture`.
+        time_window (int): The maximum time in seconds between a request and a
+                           response to be considered correlated. Defaults to 2.
+
+    Returns:
+        list: A list of dictionaries, each representing a suspicious directed
+              probe response event.
+    """
+    suspicious_responses = []
+    reported_events = set()
+
+    # Create a quick lookup for beaconing APs (those with a beacon interval)
+    beaconing_aps = {bssid for bssid, data in context['access_points'].items() if data.get('interval') is not None}
+
+    # Sort both lists by time to allow for efficient correlation
+    sorted_requests = sorted(context.get('probe_requests', []), key=lambda x: x['time'])
+    sorted_responses = sorted(context.get('probe_responses', []), key=lambda x: x['time'])
+
+    req_idx = 0
+    for resp in sorted_responses:
+        # Find the window of relevant requests
+        while req_idx < len(sorted_requests) and sorted_requests[req_idx]['time'] < resp['time'] - time_window:
+            req_idx += 1
+
+        # Search for a matching request in the current window
+        for i in range(req_idx, len(sorted_requests)):
+            req = sorted_requests[i]
+            if req['time'] > resp['time']: break
+
+            if req['client'] == resp['client'] and req['ssid'] == resp['ssid'] and req['ssid'] != "<Broadcast>":
+                # A non-beaconing AP sending a directed response is highly suspicious.
+                if resp['ap'] not in beaconing_aps:
+                    event_key = (resp['client'], resp['ssid'], resp['ap'])
+                    if event_key not in reported_events:
+                        suspicious_responses.append({
+                            "client": resp['client'], "ssid": resp['ssid'], "rogue_ap": resp['ap'],
+                            "confidence": "High (Non-Beaconing AP)", "req_frame": req['frame_num'], "resp_frame": resp['frame_num']
+                        })
+                        reported_events.add(event_key)
+                        break
+    return suspicious_responses
+
+def detect_arp_spoofing_context(context):
+    """
+    Detects ARP spoofing attacks by identifying IP-MAC address contradictions.
+
+    This function builds a "ground truth" map of IP to MAC addresses from
+    the first ARP reply seen for each IP. It then flags any subsequent ARP
+    reply where the same IP is claimed by a different MAC address.
+
+    Args:
+        context (dict): The analysis context from `analyse_capture`.
+
+    Returns:
+        list: A list of dictionaries, each representing a detected spoofing event.
+    """
+    ip_mac_map = {}
+    spoofing_events = []
+    reported_spoofs = set()
+
+    # Sort frames by frame number to process in order
+    sorted_arp_frames = sorted(context.get('arp_frames', []), key=lambda x: x['frame_num'])
+
+    for frame in sorted_arp_frames:
+        # We are interested in ARP replies ("is-at")
+        if frame['op'] != 2:
+            continue
+
+        ip = frame['psrc']
+        mac = frame['hwsrc']
+
+        if ip in ip_mac_map:
+            legit_mac = ip_mac_map[ip]
+            if mac != legit_mac:
+                # This is a contradiction, potential spoofing
+                spoof_key = (ip, legit_mac, mac)
+                if spoof_key not in reported_spoofs:
+                    spoofing_events.append({"ip_address": ip, "legit_mac": legit_mac, "rogue_mac": mac, "first_frame": frame['frame_num']})
+                    reported_spoofs.add(spoof_key)
+        else:
+            # First time we see this IP, establish it as ground truth
+            ip_mac_map[ip] = mac
+
+    return spoofing_events
+
+def detect_auth_flood_context(context, threshold=20):
+    """
+    Detects authentication flood attacks from the analysis context.
+
+    This function identifies flood events by counting authentication frames
+    sent to a specific target AP within one-second intervals and checking if
+    the count exceeds a given threshold.
+
+    Args:
+        context (dict): The analysis context from `analyse_capture`.
+        threshold (int): The minimum number of auth frames per second to be
+                         considered a flood. Defaults to 20.
+
+    Returns:
+        list: A list of dictionaries, each representing a detected flood event.
+    """
+    time_buckets = defaultdict(int)
+
+    for frame in context['auth_frames']:
+        timestamp = int(frame['time'])
+        # The target of an auth flood is the receiver (the AP)
+        target = frame['receiver']
+
+        key = (timestamp, target)
+        time_buckets[key] += 1
+
+    flood_events = []
+    for (timestamp, target), count in time_buckets.items():
+        if count >= threshold:
+            flood_events.append({
+                "timestamp": timestamp,
+                "target_ap": target,
+                "frame_count": count
+            })
+
+    return sorted(flood_events, key=lambda x: x['timestamp'])
+
+def detect_beacon_flood_context(context, volume_threshold=100, variety_threshold=20):
+    """
+    Detects beacon flood attacks from the analysis context.
+
+    This function identifies flood events by analysing two metrics within
+    one-second intervals:
+    1. The total volume of beacon frames.
+    2. The variety of unique source BSSIDs.
+
+    Args:
+        context (dict): The analysis context from `analyse_capture`.
+        volume_threshold (int): The minimum number of beacons per second to be
+                                considered a flood. Defaults to 100.
+        variety_threshold (int): The minimum number of unique BSSIDs per second
+                                 to be considered a flood. Defaults to 20.
+
+    Returns:
+        list: A list of dictionaries, each representing a detected flood event.
+    """
+    time_buckets = defaultdict(list)
+
+    for frame in context['beacon_frames']:
+        timestamp = int(frame['time'])
+        bssid = frame['bssid']
+        time_buckets[timestamp].append(bssid)
+
+    flood_events = []
+    for timestamp, bssids in time_buckets.items():
+        total_beacons = len(bssids)
+        unique_bssids = len(set(bssids))
+
+        if total_beacons >= volume_threshold or unique_bssids >= variety_threshold:
+            flood_events.append({
+                "timestamp": timestamp, "total_beacons": total_beacons,
+                "unique_bssids": unique_bssids,
             })
 
     return sorted(flood_events, key=lambda x: x['timestamp'])
