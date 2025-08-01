@@ -398,15 +398,14 @@ def detect_unencrypted_traffic_context(context):
     for (client, ap), data in pair_data.items():
         # A flow is only confirmed if it's bidirectional
         if data["c2a"] > 0 and data["a2c"] > 0:
-            # And the AP is an open network (no privacy bit set)
-            ap_properties = context['access_points'].get(ap, {})
-            if not ap_properties.get('privacy'):
-                confirmed_flows.append({
-                    "client": client,
-                    "ap": ap,
-                    "frames": data["c2a"] + data["a2c"],
-                    "layers": sorted(list(data['layers'])) or ["Unknown"]
-                })
+            # The presence of any bidirectional unencrypted traffic is a finding.
+            # The calling script can use context to decide if the AP was "Open" or just misconfigured.
+            confirmed_flows.append({
+                "client": client,
+                "ap": ap,
+                "frames": data["c2a"] + data["a2c"],
+                "layers": sorted(list(data['layers'])) or ["Unknown"]
+            })
     return confirmed_flows
 
 def detect_misconfigured_aps_context(context):
