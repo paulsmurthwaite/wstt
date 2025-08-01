@@ -497,6 +497,17 @@ def detect_directed_probe_response_context(context, time_window=2):
     # Create a quick lookup for beaconing APs (those with a beacon interval)
     beaconing_aps = {bssid for bssid, data in context['access_points'].items() if data.get('interval') is not None}
 
+    # Create a lookup for BSSIDs involved in an SSID collision (Evil Twins)
+    ssid_map = defaultdict(list)
+    for bssid, data in context['access_points'].items():
+        if data.get("ssid") and data["ssid"] != "<hidden>":
+            ssid_map[data["ssid"]].append(bssid)
+
+    colliding_bssids = set()
+    for bssids in ssid_map.values():
+        if len(bssids) > 1:
+            colliding_bssids.update(bssids)
+
     # Sort both lists by time to allow for efficient correlation
     sorted_requests = sorted(context.get('probe_requests', []), key=lambda x: x['time'])
     sorted_responses = sorted(context.get('probe_responses', []), key=lambda x: x['time'])
@@ -513,13 +524,17 @@ def detect_directed_probe_response_context(context, time_window=2):
             if req['time'] > resp['time']: break
 
             if req['client'] == resp['client'] and req['ssid'] == resp['ssid'] and req['ssid'] != "<Broadcast>":
-                # A non-beaconing AP sending a directed response is highly suspicious.
-                if resp['ap'] not in beaconing_aps:
+                is_non_beaconing = resp['ap'] not in beaconing_aps
+                is_evil_twin_responder = resp['ap'] in colliding_bssids
+
+                if is_non_beaconing or is_evil_twin_responder:
+                    confidence = "High (Non-Beaconing AP)" if is_non_beaconing else "High (Evil Twin Responder)"
                     event_key = (resp['client'], resp['ssid'], resp['ap'])
                     if event_key not in reported_events:
                         suspicious_responses.append({
                             "client": resp['client'], "ssid": resp['ssid'], "rogue_ap": resp['ap'],
-                            "confidence": "High (Non-Beaconing AP)", "req_frame": req['frame_num'], "resp_frame": resp['frame_num']
+                            "confidence": confidence, "req_frame": req['frame_num'],
+                            "resp_frame": resp['frame_num']
                         })
                         reported_events.add(event_key)
                         break
