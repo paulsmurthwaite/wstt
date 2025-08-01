@@ -42,7 +42,7 @@ source venv/bin/activate
 
 #### Install dependencies
 ```bash
-pip install scapy pyfiglet tabulate
+pip install -r requirements.txt
 ```
 
 ---
