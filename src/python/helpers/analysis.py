@@ -100,7 +100,8 @@ def analyse_capture(packets):
 
             privacy = "privacy" in pkt.sprintf("{Dot11Beacon:%Dot11Beacon.cap%}{Dot11ProbeResp:%Dot11ProbeResp.cap%}")
 
-            if bssid not in context["access_points"]:
+            ap_entry = context["access_points"].get(bssid)
+            if not ap_entry:
                 context["access_points"][bssid] = {
                     "bssid": bssid, "ssid": ssid, "channel": channel,
                     "privacy": privacy, "wpa": wpa_found, "rsn": rsn_found, "country": country,
@@ -108,6 +109,12 @@ def analyse_capture(packets):
                     "interval": pkt[Dot11Beacon].beacon_interval if pkt.haslayer(Dot11Beacon) else None,
                     "first_seen": i
                 }
+            else:
+                # If we see a beacon later, it's a better source of truth for interval and SSID.
+                if pkt.haslayer(Dot11Beacon):
+                    if ap_entry.get('interval') is None:
+                        ap_entry['interval'] = pkt[Dot11Beacon].beacon_interval
+                    ap_entry['ssid'] = ssid
 
         elif pkt.haslayer(Dot11ProbeReq):
             client = pkt.addr2
