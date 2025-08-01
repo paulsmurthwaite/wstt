@@ -74,20 +74,23 @@ def main():
     print_success("Analysis context created successfully.")
 
     print_waiting("Detecting directed probe response events...")
-    suspicious_responses = detect_directed_probe_response_context(context)
+    probe_events = detect_directed_probe_response_context(context)
 
     # --- Evaluation ---
     status = "NEGATIVE"
-    conclusion = "No suspicious directed probe responses were detected."
-    observations = ["No evidence of an AP impersonating a network in response to a client probe was found."]
+    conclusion = "No correlated probe request/response events were detected."
+    observations = ["No clients were observed probing for specific networks that were then answered by an AP."]
     
-    if suspicious_responses:
+    if probe_events:
         status = "POSITIVE"
-        conclusion = "A suspicious directed probe response attack was detected."
+        conclusion = "Correlated probe request/response events were detected."
         observations = [
-            "A non-beaconing AP was observed sending a probe response to a client.",
-            "This indicates a likely attempt to lure a client into connecting to a malicious network."
+            "One or more clients sent a probe for a specific network, and an AP responded.",
+            "Review the 'Notes' column to assess the legitimacy of the responding APs."
         ]
+        # Add a specific observation if a high-confidence event is found
+        if any("Standard" not in e["notes"] for e in probe_events):
+            observations.append("At least one event has suspicious characteristics (non-beaconing or Evil Twin).")
     
     print_blank()
     print_prompt("Press Enter to display the summary")
@@ -97,7 +100,7 @@ def main():
     ui_header("T016 – Directed Probe Response - Summary")
     print_blank()
 
-    print_table("Suspicious Directed Probe Responses:", suspicious_responses)
+    print_table("Correlated Probe Events:", probe_events)
 
     print_info("Observations:")
     for line in observations:

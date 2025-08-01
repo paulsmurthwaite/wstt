@@ -483,11 +483,12 @@ def detect_deauth_flood_context(context, threshold=20):
 
 def detect_directed_probe_response_context(context, time_window=2):
     """
-    Detects directed probe responses, a key indicator of an AP impersonation attack.
+    Detects and correlates directed probe requests and responses.
 
-    This function correlates Probe Requests from clients with subsequent Probe
-    Responses from APs. It flags responses as suspicious if they are not from
-    an AP that is actively broadcasting beacons.
+    This function identifies all instances where a client's probe request for a
+    specific SSID is answered by a probe response from an AP. It annotates each
+    event with notes about the responding AP's nature (e.g., non-beaconing,
+    part of an Evil Twin pair) to help an analyst assess its legitimacy.
 
     Args:
         context (dict): The analysis context from `analyse_capture`.
@@ -495,10 +496,9 @@ def detect_directed_probe_response_context(context, time_window=2):
                            response to be considered correlated. Defaults to 2.
 
     Returns:
-        list: A list of dictionaries, each representing a suspicious directed
-              probe response event.
+        list: A list of dictionaries, each representing a correlated probe event.
     """
-    suspicious_responses = []
+    correlated_events = []
     reported_events = set()
 
     # Create a quick lookup for beaconing APs (those with a beacon interval)
@@ -531,21 +531,28 @@ def detect_directed_probe_response_context(context, time_window=2):
             if req['time'] > resp['time']: break
 
             if req['client'] == resp['client'] and req['ssid'] == resp['ssid'] and req['ssid'] != "<Broadcast>":
-                is_non_beaconing = resp['ap'] not in beaconing_aps
-                is_evil_twin_responder = resp['ap'] in colliding_bssids
+                event_key = (resp['client'], resp['ssid'], resp['ap'])
+                if event_key in reported_events:
+                    continue
 
-                if is_non_beaconing or is_evil_twin_responder:
-                    confidence = "High (Non-Beaconing AP)" if is_non_beaconing else "High (Evil Twin Responder)"
-                    event_key = (resp['client'], resp['ssid'], resp['ap'])
-                    if event_key not in reported_events:
-                        suspicious_responses.append({
-                            "client": resp['client'], "ssid": resp['ssid'], "rogue_ap": resp['ap'],
-                            "confidence": confidence, "req_frame": req['frame_num'],
-                            "resp_frame": resp['frame_num']
-                        })
-                        reported_events.add(event_key)
-                        break
-    return suspicious_responses
+                notes = []
+                if resp['ap'] not in beaconing_aps:
+                    notes.append("Responder is non-beaconing")
+                if resp['ap'] in colliding_bssids:
+                    notes.append("Responder is an Evil Twin")
+                
+                if not notes:
+                    notes.append("Standard AP response")
+
+                correlated_events.append({
+                    "client": resp['client'], "ssid_probed": resp['ssid'],
+                    "responding_ap": resp['ap'], "notes": ", ".join(notes),
+                    "req_frame": req['frame_num'], "resp_frame": resp['frame_num']
+                })
+                reported_events.add(event_key)
+                break # Move to the next response once a request is correlated
+
+    return sorted(correlated_events, key=lambda x: x['resp_frame'])
 
 def detect_arp_spoofing_context(context):
     """
