@@ -18,7 +18,6 @@ import os
 import sys
 import logging
 from collections import defaultdict
-from scapy.all import Dot11ProbeReq
 from tabulate import tabulate
 
 # Add the project's root directory to the Python path
@@ -72,13 +71,19 @@ def main():
         context = analyse_capture(packets)
         log.info(
             "Analysis complete. Context created with %d APs and %d probe requests.",
-            len(context['access_points']),
-            sum(len(ssids) for ssids in context['probe_requests'].values())
+            len(context.get('access_points', {})),
+            len(context.get('probe_requests', []))
         )
         print_success("Analysis context created successfully.")
 
-        # Retrieve probe request data from the central analysis context
-        probes_by_mac = context.get("probe_requests", {})
+        # --- Data Transformation ---
+        # The analysis engine returns a flat list of probe request events.
+        # We need to group them by the client MAC address for this report.
+        probes_by_mac = defaultdict(set)
+        for probe in context.get("probe_requests", []):
+            # We are only interested in directed probes, not broadcast probes (empty SSID)
+            if probe.get('ssid'):
+                probes_by_mac[probe['client']].add(probe['ssid'])
 
         # --- Evaluation ---
         status = "NEGATIVE"
