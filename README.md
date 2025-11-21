@@ -1,5 +1,7 @@
 # Wireless Security Testing Toolkit (WSTT) v0.1-alpha
 
+## NOTE: This Repo supported a final year university project is now archived and no longer maintained ##
+
 ## Overview
 WSTT is a Python-based toolkit that provides a menu-driven command-line interface for managing wireless interfaces, scanning for networks, capturing traffic, and simulating/detecting common wireless security threats.
 
