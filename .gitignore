@@ -3,21 +3,24 @@ env/
 
 # Ignore compiled Python files
 __pycache__/
+__pycache__
 *.pyc
 *.pyo
 
 # Ignore test reports & logs
 logs/
+/src/python/logs/
 *.pytest_cache/
 *.log
 *.csv
 *.pcap
 
 # Ignore local backups & other files
-backup_wstt.sh
+backup_*.sh
 *.txt
 
 # Ignore legacy files
+/archive/
 archive/
 
 # Ignore VS Code settings
